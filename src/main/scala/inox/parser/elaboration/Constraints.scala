@@ -2,7 +2,7 @@ package inox
 package parser
 package elaboration
 
-import scala.util.parsing.input.Position
+import scala.util.parsing.input.{Position, Positional}
 
 trait Constraints { self: IRs with SimpleTypes with ElaborationErrors =>
 
@@ -10,7 +10,13 @@ trait Constraints { self: IRs with SimpleTypes with ElaborationErrors =>
   import TypeClasses._
   import Constraints._
 
-  sealed trait Constraint
+  sealed trait Constraint extends Positional {
+    def withPosition(pos: Position): Constraint = this match {
+      case Exists(tpe) => Exists(tpe).setPos(pos)
+      case Equals(left, right) => Equals(left, right).setPos(pos)
+      case HasClass(elem, tpeClass) => HasClass(elem, tpeClass).setPos(pos)
+    }
+  }
   object Constraints {
     case class Exists(elem: Type) extends Constraint
     case class Equals(left: Type, right: Type) extends Constraint
