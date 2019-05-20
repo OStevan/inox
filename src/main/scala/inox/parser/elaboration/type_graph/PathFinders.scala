@@ -9,7 +9,7 @@ trait PathFinders { self: GraphStructure =>
     * @param edges constructing a path
     * @param finder used to generate the path
     */
-  class GraphPath private (val edges: Array[Edge], val finder: PathFinder) {
+  class GraphPath (val edges: Array[Edge], val finder: PathFinder) {
     assert(edges.length != 0, "Path should have some edges connecting the two ")
 
     /**
@@ -201,7 +201,7 @@ trait PathFinders { self: GraphStructure =>
   /**
     * Finds context free language reachable paths
     */
-  abstract class CFLPathFinder () extends PathFinder {
+  abstract class CFLPathFinder extends PathFinder {
 
     protected class Evidence(val from: Node, val to: Node)
 
@@ -272,7 +272,7 @@ trait PathFinders { self: GraphStructure =>
   /**
     * Finds shortest paths
     */
-  class ShortestPathFinder extends CFLPathFinder {
+  class ShortestPathFinder(graph: Graph) extends CFLPathFinder(graph) {
 
     private val INFINITY = Int.MaxValue
     val shortestLEQPaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()

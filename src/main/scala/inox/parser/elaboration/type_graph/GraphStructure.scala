@@ -176,7 +176,10 @@ trait GraphStructure { self: SimpleTypes with Constraints =>
   }
 
 
-  def constructSeq(types: Seq[SimpleTypes.Type]): Seq[(Node, ConstraintGraph)] = types.map(tpe => construct(tpe))
+  def constructSeq(constraints: Seq[Constraint]): ConstraintGraph =
+    constraints.map((constraint: Constraint) => construct(constraint)).foldLeft(ConstraintGraph.empty()) {
+      case (acc, graph) => acc union graph
+    }
 
   def construct(constraint: Constraint): ConstraintGraph = constraint match {
     case Equals(left, right) =>
