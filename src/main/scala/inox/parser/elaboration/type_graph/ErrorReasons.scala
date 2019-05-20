@@ -16,13 +16,12 @@ trait ErrorReasons { self: PathFinders =>
 
 
   /**
-    * Basic unit of error reporting, expressions, missing hypothesis.
+    * Basic unit of error reporting, expressions, etc.
     */
   abstract class Entity (val satisfiablePathsCount: Int) {
 
     /**
       * Checks if this entity gives a reason why an error happened, in case of expressions it should appear on a path
-      * and in case of a missing hypothesis it removes an error on a path.
       * @param path represents and unsatisfiable path between two nodes for which we are searching for an explanation
       * @return flag if it in fact explains the reason why the path is unsatisfiable
       */

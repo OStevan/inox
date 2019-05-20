@@ -10,14 +10,6 @@ trait PathFinders { self: GraphStructure =>
     * @param finder used to generate the path
     */
   class GraphPath private (val edges: Array[Edge], val finder: PathFinder) {
-    def minimalHypothesis(): (Node, Node) = {
-      if (edges.isEmpty)
-        null
-      else
-        (firstInPath(), lastInPath())
-    }
-
-
     assert(edges.length != 0, "Path should have some edges connecting the two ")
 
     /**
@@ -45,6 +37,23 @@ trait PathFinders { self: GraphStructure =>
     }
 
     /**
+      * TODO maybe change this to be more generic?
+      * Checks of from is less or equal to to structurally, without any prior knowledge
+      * @param from
+      * @param to
+      * @return
+      */
+    private def leq(from: Node, to: Node): Boolean = {
+      if (from == to)
+        return true
+
+      if (from.isTrivialEnd || to.isTrivialEnd)
+        return true
+
+      false
+    }
+
+    /**
       * Method to get the first element in a path
       * @return node representing the start of the path
       */
@@ -56,6 +65,22 @@ trait PathFinders { self: GraphStructure =>
       */
     def lastInPath(): Node = edges(edges.length - 1).to()
 
+    private def satisfiable(from: Node, to: Node): Boolean = {
+
+
+      // TODO finish this
+      if (from == to)
+        return true
+
+      // TODO add for constructors
+
+      if (leq(from, to))
+        return true
+
+
+      false
+    }
+
     /**
       * checks if the path is satisfiable having the constraint in mind
       * @return
@@ -63,10 +88,7 @@ trait PathFinders { self: GraphStructure =>
     def isSatisfiablePath: Boolean = {
       if (edges.length == 0)
         return false
-
-      // TODO change this to check satisfiability
-//      hypothesis.satisfiable(firstInPath(), lastInPath())
-      true
+      satisfiable(firstInPath(), lastInPath())
     }
 
     /**
@@ -81,9 +103,7 @@ trait PathFinders { self: GraphStructure =>
       if (firstInPath() ==  lastInPath())
         return true
 
-      // TODO change this to check satisfiability
-//      hypothesis.leq(firstInPath(), lastInPath())
-      true
+      leq(firstInPath(), lastInPath())
     }
 
     /**
@@ -95,7 +115,7 @@ trait PathFinders { self: GraphStructure =>
     }
 
     /**
-      * Checks if the path is satisfiable having the path hypothesis in mind
+      * Checks if the path is satisfiable
       * @return
       */
     def isUnsatisfiable: Boolean = {
@@ -135,9 +155,9 @@ trait PathFinders { self: GraphStructure =>
           if (leqElements.nonEmpty &&
             // path until here is not satisfiable
             // TODO see how to change this
-//            !hypothesis.satisfiable(leqElements.top, edge.to()) &&
+            !satisfiable(leqElements.top, edge.to()) &&
             // we have reached the same element from were we started
-            // edge edge is the same as the current to
+            // edge from is the same as edge to
             !(leqElements.top == firstInPath()) && edge.to() == lastInPath())
             return false
           else if (!edge.to().hasVars) {
