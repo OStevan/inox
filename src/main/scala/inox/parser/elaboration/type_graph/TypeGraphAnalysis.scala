@@ -2,8 +2,8 @@ package inox.parser.elaboration.type_graph
 
 import inox.parser.elaboration.{Constraints, SimpleTypes}
 
-trait TypeGraphAnalysis extends GraphStructure with ErrorReasons with ErrorInferencers with PathFinders {
-  self: SimpleTypes with Constraints with ErrorReasonSearch =>
+trait TypeGraphAnalysis extends GraphStructure with ErrorReasons with ErrorInferencers with PathFinders with ErrorReasonSearch{
+  self: SimpleTypes with Constraints  =>
 
 
   class ConstraintGraphAnalysis {
@@ -71,7 +71,7 @@ trait TypeGraphAnalysis extends GraphStructure with ErrorReasons with ErrorInfer
     }
 
 
-    def getSuggestions(unsatisfiablePaths: List[GraphPath]): Reason = {
+    def getSuggestions(unsatisfiablePaths: Seq[GraphPath]): Reason = {
       var result: List[Reason] = List()
 
       result = result ++ new TypeReasonInference(unsatisfiablePaths, graph.nodes).infer()

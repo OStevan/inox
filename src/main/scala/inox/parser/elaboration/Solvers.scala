@@ -2,9 +2,11 @@ package inox
 package parser
 package elaboration
 
+import inox.parser.elaboration.type_graph.TypeGraphAnalysis
+
 import scala.util.parsing.input.Position
 
-trait Solvers { self: Constraints with SimpleTypes with IRs with ElaborationErrors =>
+trait Solvers { self: Constraints with SimpleTypes with IRs with ElaborationErrors with TypeGraphAnalysis =>
 
   import SimpleTypes._
   import TypeClasses._
@@ -119,7 +121,18 @@ trait Solvers { self: Constraints with SimpleTypes with IRs with ElaborationErro
       Right(unifier)
     }
     catch {
-      case UnificationError(error, positions) => Left(error(positions))
+      case UnificationError(error, positions) =>
+        val diagnosis = GraphDiagnosis.getInstance(constraints)
+
+        try {
+          val reasons = diagnosis.getSuggestions(diagnosis.getUnsatisfiablePaths())
+          Left(error(positions))
+        } catch {
+          case _: Exception => Left(error(positions))
+        } finally {
+          Left(error(positions))
+        }
+
     }
   }
 }

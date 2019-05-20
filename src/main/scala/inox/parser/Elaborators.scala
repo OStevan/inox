@@ -3,6 +3,7 @@ package parser
 
 import elaboration._
 import elaborators._
+import elaboration.type_graph.TypeGraphAnalysis
 
 trait Elaborators
   extends Trees
@@ -21,6 +22,7 @@ trait Elaborators
      with ProgramElaborators
      with NumberUtils
      with Solvers
+     with TypeGraphAnalysis
      with ElaborationErrors {
 
   type Signature = (Int, Seq[SimpleTypes.Type] => (Seq[SimpleTypes.Type], SimpleTypes.Type))
