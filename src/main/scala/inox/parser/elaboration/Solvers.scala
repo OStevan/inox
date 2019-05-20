@@ -126,7 +126,7 @@ trait Solvers { self: Constraints with SimpleTypes with IRs with ElaborationErro
 
         try {
           val reasons = diagnosis.getSuggestions(diagnosis.getUnsatisfiablePaths())
-          Left(error(positions))
+          Left(reasons.toErrorMessage())
         } catch {
           case _: Exception => Left(error(positions))
         } finally {

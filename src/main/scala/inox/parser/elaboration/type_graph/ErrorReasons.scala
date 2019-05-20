@@ -1,27 +1,35 @@
 package inox.parser.elaboration.type_graph
 
+import inox.parser.ElaborationErrors
+import inox.parser.elaboration.SimpleTypes
+
 import scala.util.parsing.input.Position
 
-trait ErrorReasons { self: PathFinders =>
+trait ErrorReasons {
+  self: PathFinders with SimpleTypes with ElaborationErrors=>
 
   /**
     * Result of type graph error diagnosis, this should be mapped to an exception which can be used by rest of
     * the Inox
+    *
     * @param entities which provide this explanation
-    * @param weight calculated weight of this reason
+    * @param weight   calculated weight of this reason
     */
-  case class Reason (entities: Set[Entity], weight: Double) extends Comparable[Reason]{
+  case class Reason(entities: Set[Entity], weight: Double) extends Comparable[Reason] {
     override def compareTo(other: Reason): Int = weight.compareTo(other.weight)
+
+    def toErrorMessage(): String = withPositions("Invalid assigned types")(entities.map(_.pos).toSeq)
   }
 
 
   /**
     * Basic unit of error reporting, expressions, etc.
     */
-  abstract class Entity (val satisfiablePathsCount: Int) {
+  abstract class Entity(val pos: Position, val satisfiablePathsCount: Int) {
 
     /**
       * Checks if this entity gives a reason why an error happened, in case of expressions it should appear on a path
+      *
       * @param path represents and unsatisfiable path between two nodes for which we are searching for an explanation
       * @return flag if it in fact explains the reason why the path is unsatisfiable
       */
@@ -33,8 +41,7 @@ trait ErrorReasons { self: PathFinders =>
   /**
     * Gives reasons why assigned types are incorrect, entity is represented as a type assigned at a certain position
     */
-  case class TypeEntity(position: Position, satisfiableCount: Int) extends Entity(satisfiableCount) {
-
+  case class TypeEntity(position: Position, satisfiableCount: Int) extends Entity(position, satisfiableCount) {
 
     /**
       * Checks if this entity gives a valid reason why the expression is not satisfiable
@@ -46,5 +53,4 @@ trait ErrorReasons { self: PathFinders =>
       path.pathNodes().exists(node => node.pos == position)
     }
   }
-
 }

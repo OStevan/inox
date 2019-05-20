@@ -1,9 +1,10 @@
 package inox.parser.elaboration.type_graph
 
+import inox.parser.ElaborationErrors
 import inox.parser.elaboration.{Constraints, SimpleTypes}
 
 trait TypeGraphAnalysis extends GraphStructure with ErrorReasons with ErrorInferencers with PathFinders with ErrorReasonSearch{
-  self: SimpleTypes with Constraints  =>
+  self: SimpleTypes with Constraints  with ElaborationErrors =>
 
 
   class ConstraintGraphAnalysis {
