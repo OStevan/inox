@@ -26,10 +26,10 @@ trait Constraints { self: IRs with SimpleTypes with ElaborationErrors =>
   object Constraint {
     def exist(elem: Unknown): Constraint = Exists(elem)
     def equal(left: Type, right: Type): Constraint = Equals(left, right)
-    def isNumeric(elem: Type): Constraint = HasClass(elem, Numeric)
-    def isIntegral(elem: Type): Constraint = HasClass(elem, Integral)
-    def isComparable(elem: Type): Constraint = HasClass(elem, Comparable)
-    def isBits(elem: Type, lower: Option[Int] = None, upper: Option[Int] = None, signed: Boolean = true) =
+    def isNumeric(elem: Type, pos: Position): Constraint = HasClass(elem, Numeric).setPos(pos)
+    def isIntegral(elem: Type, pos: Position): Constraint = HasClass(elem, Integral).setPos(pos)
+    def isComparable(elem: Type, pos: Position): Constraint = HasClass(elem, Comparable).setPos(pos)
+    def isBits(elem: Type, pos: Position, lower: Option[Int] = None, upper: Option[Int] = None, signed: Boolean = true) =
       HasClass(elem, Bits(signed, (lower, upper) match {
         case (None, None) => NoSpec
         case (Some(l), None) => GreaterEquals(l)
@@ -37,17 +37,17 @@ trait Constraints { self: IRs with SimpleTypes with ElaborationErrors =>
         case (Some(l), Some(u)) => Between(l, u).validate.getOrElse {
           throw new IllegalArgumentException("Invalid bounds.")
         }
-      }))
-    def atIndexIs(scrutinee: Type, index: Int, value: Type): Constraint =
-      HasClass(scrutinee, WithIndices(Map(index -> value)))
-    def hasFields(elem: Type, fields: Set[String], sorts: Seq[(inox.Identifier, Type => Seq[Constraint])]): Constraint = {
+      })).setPos(pos)
+    def atIndexIs(scrutinee: Type, index: Int, value: Type, pos: Position): Constraint =
+      HasClass(scrutinee, WithIndices(Map(index -> value))).setPos(pos)
+    def hasFields(elem: Type, fields: Set[String], sorts: Seq[(inox.Identifier, Type => Seq[Constraint])], pos: Position): Constraint = {
       val mapping = sorts.foldLeft(Map[inox.Identifier, Type => Seq[Constraint]]()) {
         case (acc, (id, f)) => acc.get(id) match {
           case None => acc + (id -> f)
           case Some(f2) => acc + (id -> { (t: Type) => f2(t) ++ f(t) })
         }
       }
-      HasClass(elem, WithFields(fields, mapping))
+      HasClass(elem, WithFields(fields, mapping)).setPos(pos)
     }
   }
 

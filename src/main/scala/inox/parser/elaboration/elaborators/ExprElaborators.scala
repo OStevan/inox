@@ -41,7 +41,7 @@ trait ExprElaborators { self: Elaborators =>
             case _ => throw new IllegalStateException("Unifier returned unexpected value.")
           }
         }
-        Constrained.pure((u, v)).addConstraint(Constraint.isNumeric(u))
+        Constrained.pure((u, v)).addConstraint(Constraint.isNumeric(u, template.pos))
       }
       case FractionLiteral(numerator, denominator) =>
         Constrained.pure((SimpleTypes.RealType().setPos(template.pos), Eventual.pure(trees.FractionLiteral(numerator, denominator))))
@@ -125,11 +125,11 @@ trait ExprElaborators { self: Elaborators =>
       })
       case Cast(Casts.Widen, expr, size) => for {
         (st, ev) <- ExprE.elaborate(expr)
-        _ <- Constrained(Constraint.isBits(st, upper=Some(size - 1)))
+        _ <- Constrained(Constraint.isBits(st, upper=Some(size - 1), pos = template.pos))
       } yield (SimpleTypes.BitVectorType(true, size).setPos(template.pos), ev.map(trees.BVWideningCast(_, trees.BVType(true, size))))
       case Cast(Casts.Narrow, expr, size) => for {
         (st, ev) <- ExprE.elaborate(expr)
-        _ <- Constrained(Constraint.isBits(st, lower=Some(size + 1)))
+        _ <- Constrained(Constraint.isBits(st, lower=Some(size + 1), pos = template.pos))
       } yield (SimpleTypes.BitVectorType(true, size).setPos(template.pos), ev.map(trees.BVNarrowingCast(_, trees.BVType(true, size))))
       case Choose(binding, body) => for {
         sb <- BindingE.elaborate(binding)
@@ -347,7 +347,7 @@ trait ExprElaborators { self: Elaborators =>
       case TupleSelection(expr, index) => for {
         (st, ev) <- ExprE.elaborate(expr)
         u = SimpleTypes.Unknown.fresh.setPos(template.pos)
-        _ <- Constrained(Constraint.atIndexIs(st, index, u))
+        _ <- Constrained(Constraint.atIndexIs(st, index, u, template.pos))
       } yield (u, ev.map(trees.TupleSelect(_, index)))
       case Selection(expr, id) => for {
         (st, ev) <- ExprE.elaborate(expr)
@@ -367,7 +367,7 @@ trait ExprElaborators { self: Elaborators =>
               Constraint.equal(r, retType),
               Constraint.equal(tpe, SimpleTypes.ADTType(sortId, as).setPos(template.pos)))
           })
-        }))
+        }, pos = template.pos))
       } yield (retType, Eventual.withUnifier { implicit unifier =>
         val sortId = unifier.get(adtType) match {
           case SimpleTypes.ADTType(i, _) => i
@@ -390,7 +390,7 @@ trait ExprElaborators { self: Elaborators =>
           case Minus =>
             Constrained
               .pure((st, ev.map(trees.UMinus(_))))
-              .addConstraint(Constraint.isNumeric(st))
+              .addConstraint(Constraint.isNumeric(st, template.pos))
           case Not =>
             Constrained
               .pure((st, ev.map(trees.Not(_))))
@@ -398,7 +398,7 @@ trait ExprElaborators { self: Elaborators =>
           case BVNot =>
             Constrained
               .pure((st, ev.map(trees.BVNot(_))))
-              .addConstraint(Constraint.isBits(st))
+              .addConstraint(Constraint.isBits(st, template.pos))
         }
       }
       case BinaryOperation(op, arg1, arg2) => ExprE.elaborate(arg1).flatMap { case (st1, ev1) =>
@@ -409,32 +409,32 @@ trait ExprElaborators { self: Elaborators =>
               Constrained
                 .pure((st1, Eventual.withUnifier { implicit unifier => trees.Plus(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isNumeric(st1))
+                .addConstraint(Constraint.isNumeric(st1, template.pos))
             case Minus =>
               Constrained
                 .pure((st1, Eventual.withUnifier { implicit unifier => trees.Minus(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isNumeric(st1))
+                .addConstraint(Constraint.isNumeric(st1, template.pos))
             case Times =>
               Constrained
                 .pure((st1, Eventual.withUnifier { implicit unifier => trees.Times(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isNumeric(st1))
+                .addConstraint(Constraint.isNumeric(st1, template.pos))
             case Division =>
               Constrained
                 .pure((st1, Eventual.withUnifier { implicit unifier => trees.Division(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isNumeric(st1))
+                .addConstraint(Constraint.isNumeric(st1, template.pos))
             case Modulo =>
               Constrained
                 .pure((st1, Eventual.withUnifier { implicit unifier => trees.Modulo(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isIntegral(st1))
+                .addConstraint(Constraint.isIntegral(st1, template.pos))
             case Remainder =>
               Constrained
                 .pure((st1, Eventual.withUnifier { implicit unifier => trees.Remainder(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isIntegral(st1))
+                .addConstraint(Constraint.isIntegral(st1, template.pos))
             case Implies =>
               Constrained
                 .pure((SimpleTypes.BooleanType().setPos(template.pos), Eventual.withUnifier { implicit unifier => trees.Implies(ev1.get, ev2.get) }))
@@ -448,52 +448,52 @@ trait ExprElaborators { self: Elaborators =>
               Constrained
                 .pure((SimpleTypes.BooleanType().setPos(template.pos), Eventual.withUnifier { implicit unifier => trees.LessEquals(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isComparable(st1))
+                .addConstraint(Constraint.isComparable(st1, template.pos))
             case LessThan =>
               Constrained
                 .pure((SimpleTypes.BooleanType().setPos(template.pos), Eventual.withUnifier { implicit unifier => trees.LessThan(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isComparable(st1))
+                .addConstraint(Constraint.isComparable(st1, template.pos))
             case GreaterEquals =>
               Constrained
                 .pure((SimpleTypes.BooleanType().setPos(template.pos), Eventual.withUnifier { implicit unifier => trees.GreaterEquals(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isComparable(st1))
+                .addConstraint(Constraint.isComparable(st1, template.pos))
             case GreaterThan =>
               Constrained
                 .pure((SimpleTypes.BooleanType().setPos(template.pos), Eventual.withUnifier { implicit unifier => trees.GreaterThan(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isComparable(st1))
+                .addConstraint(Constraint.isComparable(st1, template.pos))
             case BVAnd =>
               Constrained
                 .pure((st1, Eventual.withUnifier { implicit unifier => trees.BVAnd(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isBits(st1))
+                .addConstraint(Constraint.isBits(st1, template.pos))
             case BVOr =>
               Constrained
                 .pure((st1, Eventual.withUnifier { implicit unifier => trees.BVOr(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isBits(st1))
+                .addConstraint(Constraint.isBits(st1, template.pos))
             case BVXor =>
               Constrained
                 .pure((st1, Eventual.withUnifier { implicit unifier => trees.BVXor(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isBits(st1))
+                .addConstraint(Constraint.isBits(st1, template.pos))
             case BVShiftLeft =>
               Constrained
                 .pure((st1, Eventual.withUnifier { implicit unifier => trees.BVShiftLeft(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isBits(st1))
+                .addConstraint(Constraint.isBits(st1, template.pos))
             case BVAShiftRight =>
               Constrained
                 .pure((st1, Eventual.withUnifier { implicit unifier => trees.BVAShiftRight(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isBits(st1))
+                .addConstraint(Constraint.isBits(st1, template.pos))
             case BVLShiftRight =>
               Constrained
                 .pure((st1, Eventual.withUnifier { implicit unifier => trees.BVLShiftRight(ev1.get, ev2.get) }))
                 .addConstraint(Constraint.equal(st1, st2))
-                .addConstraint(Constraint.isBits(st1))
+                .addConstraint(Constraint.isBits(st1, template.pos))
           }
         }
       }

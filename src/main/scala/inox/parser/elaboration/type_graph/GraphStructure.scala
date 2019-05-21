@@ -20,6 +20,18 @@ trait GraphStructure { self: SimpleTypes with Constraints =>
   trait Node extends Positional {
     private var counter: Int = 0
 
+    /**
+      * Tests if two nodes have the same type information
+      * @param other node to compare with
+      * @return flag if the information inside is the same
+      */
+    def nodeInformationEquality(other: Node): Boolean = (this, other) match {
+      case (first: TypeNode, second: TypeNode) => first.tpe == second.tpe
+      case (_: TypeNode, _: TypeClassNode) => false
+      case (first: TypeClassNode, second: TypeClassNode) => first.typeClass == second.typeClass
+      case _ => false
+    }
+
     def withPosition(pos: Position): Node = this match {
       case TypeNode(tpe, color) => TypeNode(tpe, color).setPos(pos)
       case TypeClassNode(tpeClass, color) => TypeClassNode(tpeClass, color).setPos(pos)
@@ -43,6 +55,7 @@ trait GraphStructure { self: SimpleTypes with Constraints =>
       setPos(tpe.pos)
 
       override def equals(obj: Any): Boolean = obj match {
+        case TypeNode(other: Unknown, _) => other == tpe
         case other: TypeNode => tpe == other.tpe && pos == other.pos
         case _ => false
       }

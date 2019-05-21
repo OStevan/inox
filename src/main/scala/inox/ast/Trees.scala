@@ -42,6 +42,10 @@ trait Trees
     protected val trees: Trees.this.type = Trees.this
   } with MacrosInterpolators
 
+  val runTimeInterpolator: RunTimeInterpolators { val trees: Trees.this.type } = new {
+    protected val trees: Trees.this.type = Trees.this
+  } with RunTimeInterpolators
+
   def aliased(id1: Identifier, id2: Identifier) = {
     id1.toString == id2.toString
   }

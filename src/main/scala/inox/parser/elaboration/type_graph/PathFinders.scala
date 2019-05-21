@@ -69,7 +69,7 @@ trait PathFinders { self: GraphStructure =>
 
 
       // TODO finish this
-      if (from == to)
+      if (from nodeInformationEquality  to)
         return true
 
       // TODO add for constructors
@@ -100,7 +100,7 @@ trait PathFinders { self: GraphStructure =>
       if (edges.length == 0)
         return false
 
-      if (firstInPath() ==  lastInPath())
+      if (firstInPath() nodeInformationEquality lastInPath())
         return true
 
       leq(firstInPath(), lastInPath())
@@ -137,7 +137,7 @@ trait PathFinders { self: GraphStructure =>
       if (edges.length == 0)
         return false
 
-      if (firstInPath() == lastInPath())
+      if (firstInPath() nodeInformationEquality lastInPath())
         return false
 
 
@@ -158,7 +158,7 @@ trait PathFinders { self: GraphStructure =>
             !satisfiable(leqElements.top, edge.to()) &&
             // we have reached the same element from were we started
             // edge from is the same as edge to
-            !(leqElements.top == firstInPath()) && edge.to() == lastInPath())
+            !(leqElements.top == firstInPath()) && (edge.to() ==  lastInPath()))
             return false
           else if (!edge.to().hasVars) {
             leqElements.pop()

@@ -18,7 +18,7 @@ trait ErrorReasons {
   case class Reason(entities: Set[Entity], weight: Double) extends Comparable[Reason] {
     override def compareTo(other: Reason): Int = weight.compareTo(other.weight)
 
-    def toErrorMessage(): String = withPositions("Invalid assigned types")(entities.map(_.pos).toSeq)
+    def toErrorMessage(): String = withPositions("graph: Invalid assigned types")(entities.map(_.pos).toSeq)
   }
 
 
