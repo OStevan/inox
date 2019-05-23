@@ -1,8 +1,10 @@
 package inox.parser.elaboration.type_graph
 
+import inox.parser.elaboration.Constraints
+
 import scala.collection.mutable
 
-trait PathFinders { self: GraphStructure =>
+trait PathFinders { self: GraphStructure with Constraints =>
 
   /**
     * Class representing a path found by path finders
@@ -44,13 +46,22 @@ trait PathFinders { self: GraphStructure =>
       * @return
       */
     private def leq(from: Node, to: Node): Boolean = {
-      if (from == to)
+      if (from nodeInformationEquality to)
         return true
 
       if (from.isTrivialEnd || to.isTrivialEnd)
         return true
 
-      false
+      (from, to) match {
+        case (Nodes.TypeClassNode(fromTpeClass, _), Nodes.TypeClassNode(toTpeClass, _)) =>
+          // TODO this currently wrong, check with Romain what to do here
+          false
+        case (Nodes.TypeNode(tpe, _), Nodes.TypeClassNode(tpeClass, _)) => tpeClass.accepts(tpe) match {
+          case None => false
+          case _ => true
+        }
+        case _ => false
+      }
     }
 
     /**
@@ -191,7 +202,34 @@ trait PathFinders { self: GraphStructure =>
 
     protected trait ReductionEdge extends Edge
 
-    protected case class LessEqual(from: Node, to: Node, size: Int) extends ReductionEdge
+    /**
+      * LEQ := LEQ LEQ
+      * LEQ := LEFT RIGHT (rule give rise to cyclic paths which are ignored)
+      * @param from node
+      * @param to node
+      * @param length of edge
+      */
+    protected case class LessEqual(from: Node, to: Node, length: Int) extends ReductionEdge
+
+    /**
+      * LEFT := original
+      * LEFT := LEFT LEQ (position is inherited from the child LEFT)
+      * @param from node
+      * @param to node
+      * @param position position in constructor
+      * @param length of the edge
+      */
+    protected case class LeftEdge(from: Node, to: Node, position: Int, length: Int) extends ReductionEdge
+
+    /**
+      * RIGHT := decompositional
+      * RIGHT := LEQ RIGHT (position is inherited from the child right)
+      * @param from node
+      * @param to node
+      * @param position position in the constructor
+      * @param size
+      */
+    protected case class RightEdge(from: Node, to: Node, position: Int, size: Int) extends ReductionEdge
 
     def getPath(from: Node, to: Node): List[Edge]
 
@@ -276,7 +314,13 @@ trait PathFinders { self: GraphStructure =>
 
     private val INFINITY = Int.MaxValue
     val shortestLEQPaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()
+    /**
+      * map from node to map of node to map of position to length
+      */
+    val shortestLeftPaths = new mutable.HashMap[Node, mutable.Map[Node, mutable.Map[Int, Int]]]()
     val queue: mutable.Queue[ReductionEdge] = mutable.Queue[ReductionEdge]()
+
+    var rightEdges: Map[Node, Map[Node, Int]] = Map.empty
 
     init()
     saturation()
@@ -284,43 +328,38 @@ trait PathFinders { self: GraphStructure =>
 
 
     def init(): Unit = {
-      for (edge <- graph.edges) {
-        shortestLEQPaths.update(edge.from(), shortestLEQPaths.getOrElse(edge.from(), new mutable.HashMap[Node, Int]()).updated(edge.to(), 1))
-        inferLeqEdge(edge.from(), edge.to(), 1, List(), atomic = true)
-      }
-
-      // temp solution, counting on the fact that we are only using leq edges
-      queue ++= graph.edges.map {
-        case a: Edges.LessEqualEdge => LessEqual(a.from, a.to, 1)
+      graph.edges.foreach {
+        case a: Edges.LessEqualEdge =>
+          inferLeqEdge(a.from, a.to, 1, List.empty, atomic = true)
+        case Edges.ConstructorEdge(from, to, Edges.ConstructorEdgeDirection.Original, position) =>
+          inferLeftEdge(from, to, 1, List.empty, position, true)
+        case Edges.ConstructorEdge(from, to, Edges.ConstructorEdgeDirection.Decompositional, position) =>
+          insertRightEdge(to, from, position)
       }
     }
 
-    //  def getPathSize(from: Node, to: Node): Int = {
-    //    shortestLEQPaths.getOrElse(from, new mutable.HashMap[Node, Int]()).getOrElse(to, INFINITY)
-    //  }
-    //
-    //  def findShortestPaths() = {
-    //    val workList = mutable.Queue[Edge]() ++ graph.edges
-    //    while (workList.nonEmpty) {
-    //      val currentEdge = workList.dequeue()
-    //      for (connectingEdge <- graph.nodeEdgesMap.getOrElse(currentEdge.to(), Set())) {
-    //        val newPathSize = getPathSize(currentEdge.from(), currentEdge.to()) + getPathSize(connectingEdge.from(), connectingEdge.to())
-    //        if (newPathSize < getPathSize(currentEdge.from(), connectingEdge.to())) {
-    //          shortestLEQPaths.update(currentEdge.from(), shortestLEQPaths.getOrElse(currentEdge.from(), new mutable.HashMap[Node, Int]()).updated(connectingEdge.to(), 1))
-    //        }
-    //      }
-    //    }
-    //  }
 
     // edge inference
     override def inferLeqEdge(from: Node, to: Node, length: Int, evidence: List[Evidence], atomic: Boolean): Unit = {
       addNextHop(from, to, evidence)
-      if (from == to)
+      if (from nodeInformationEquality to)
         return
       queue.enqueue(LessEqual(from, to, length))
       setShortestLeq(from, to, length)
       if (atomic)
         addAtomicLeqEdge(from, to)
+    }
+
+    def inferLeftEdge(from: Node, to: Node, length: Int, list: List[Evidence], position: Int, atomic: Boolean): Unit = {
+      queue.enqueue(LeftEdge(from, to, position, length))
+      setShortestLeft(from, to, position, length)
+    }
+
+    /**
+      * Not the best solution
+      */
+    def insertRightEdge(from: Node, to: Node, position: Int): Unit = {
+      rightEdges = rightEdges.updated(from, rightEdges.getOrElse(from, Map[Node, Int]()).updated(to, position))
     }
 
     // LEQ shortest path helpers
@@ -343,6 +382,20 @@ trait PathFinders { self: GraphStructure =>
     private def setShortestLeq(start: Node, end: Node, length: Int): Unit =
       shortestLEQPaths.getOrElseUpdate(start, mutable.Map[Node, Int]()).update(end, length)
 
+    // LEFT shortest path helpers
+    def setShortestLeft(from: Node, to: Node, position: Int, length: Int): Unit = {
+      shortestLeftPaths.getOrElseUpdate(from, mutable.HashMap.empty)
+        .getOrElseUpdate(to, mutable.HashMap.empty)
+        .getOrElseUpdate(position, length)
+    }
+
+    private def getShortestLeft(from: Node, to: Node, position: Int): Int = {
+      shortestLeftPaths
+        .getOrElse(from, mutable.Map[Node, mutable.Map[Int, Int]]())
+        .getOrElse(to, mutable.Map[Int, Int]())
+        .getOrElse(position, INFINITY)
+    }
+
     // CFG shortest path rules
     /**
       * apply rule LEQ = LEQ LEQ
@@ -352,7 +405,7 @@ trait PathFinders { self: GraphStructure =>
       * @param to node edging the new edge
       */
     private def ruleLeqLeq(from: Node, mid: Node, to: Node): Unit = {
-      if (from == to)
+      if (from nodeInformationEquality to)
         return
       val leftDistance = getShortestLeq(from, mid)
       val rightDistance = getShortestLeq(mid, to)
@@ -363,6 +416,44 @@ trait PathFinders { self: GraphStructure =>
       if (leftDistance + rightDistance < currentDistance) {
         setShortestLeq(from, to, leftDistance + rightDistance)
         inferLeqEdge(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)),atomic = false)
+      }
+
+    }
+
+    def ruleLeftLeq(from: Node, mid: Node, to: Node, position: Int): Unit = {
+      if (from nodeInformationEquality  to)
+        return
+      val leftDistance = getShortestLeft(from, mid, position)
+      val rightDistance = getShortestLeq(mid, to)
+      val currentDistance = getShortestLeft(from, to, position)
+
+      if (leftDistance == INFINITY || rightDistance == INFINITY)
+        return
+      if (leftDistance + rightDistance < currentDistance) {
+        setShortestLeft(from, to, position, leftDistance + rightDistance)
+        inferLeftEdge(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)), atomic = false, position=position)
+      }
+    }
+
+    def hasRightEdge(from: Node, to: Node, position: Int): Boolean = {
+      if (rightEdges.contains(from))
+        rightEdges(from).getOrElse(to, -1) == position
+      else
+        false
+    }
+
+    def ruleLeftRight(from: Node, mid: Node, to: Node, position: Int): Unit = {
+      if (from nodeInformationEquality to)
+        return
+
+      val leftDistance = getShortestLeft(from, mid, position)
+      val currentDistance = getShortestLeq(from, to)
+
+      if (leftDistance == INFINITY)
+        return
+      if (leftDistance + 1 < currentDistance) {
+        setShortestLeq(from, to, leftDistance + 1)
+        inferLeqEdge(from, to, leftDistance + 1, List(new Evidence(from, mid), new Evidence(mid, to)), atomic = false)
       }
 
     }
@@ -384,6 +475,11 @@ trait PathFinders { self: GraphStructure =>
                 ruleLeqLeq(from, to, node)
               if (hasAtomicEdge(node, from))
                 ruleLeqLeq(node, from, to)
+            case LeftEdge(from, to, position, length) =>
+              if (hasAtomicEdge(to, node))
+                ruleLeftLeq(from, to, node, position)
+              if (hasRightEdge(to, node, position))
+                ruleLeftRight(from, to, node, position)
           }
         }
       }
