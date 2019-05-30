@@ -20,24 +20,11 @@ class SimpleTests extends FunSuite {
 //       println(text)
 //   }
 // }
-//
-//  test("conflict in generated constraints") {
-//    try {
-//      e"""let x = 1;
-//        length(x)"""
-//      fail("No errors detected, while there should be one")
-//    } catch {
-//      case InterpolatorException(text) =>
-//        assert(text.contains("graph"))
-//        println(text)
-//    }
-//  }
-//
-  test("if expression branch result type conflicts") {
+
+  test("conflict in generated constraints") {
     try {
-      e"""
-         if (4>3) 0 else 'conflict'
-       """
+      e"""let x = 1;
+        length(x)"""
       fail("No errors detected, while there should be one")
     } catch {
       case InterpolatorException(text) =>
@@ -46,6 +33,19 @@ class SimpleTests extends FunSuite {
     }
   }
 
+//  test("if expression branch result type conflicts") {
+//    try {
+//      e"""
+//         if (4>3) 0 else 'conflict'
+//       """
+//      fail("No errors detected, while there should be one")
+//    } catch {
+//      case InterpolatorException(text) =>
+//        assert(text.contains("graph"))
+//        println(text)
+//    }
+//  }
+//
 //  test("user specified type changes the result of the above test") {
 //    try {
 //      e"""
@@ -59,18 +59,18 @@ class SimpleTests extends FunSuite {
 //        println(text)
 //    }
 //  }
-
-  test("type error based on the most likely case") {
-    try {
-      e"""
-         let x = if (4>3) 0 else 'conflict';
-         length(x)
-       """
-      fail("No errors detected, while there should be one")
-    } catch {
-      case InterpolatorException(text) =>
-        assert(text.contains("graph"), text)
-        println(text)
-    }
-  }
+//
+//  test("type error based on the most likely case") {
+//    try {
+//      e"""
+//         let x = if (4>3) 0 else 'conflict';
+//         length(x)
+//       """
+//      fail("No errors detected, while there should be one")
+//    } catch {
+//      case InterpolatorException(text) =>
+//        assert(text.contains("graph"), text)
+//        println(text)
+//    }
+//  }
 }

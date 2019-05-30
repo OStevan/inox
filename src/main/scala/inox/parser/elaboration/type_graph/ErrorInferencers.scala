@@ -50,7 +50,7 @@ trait ErrorInferencers {
 
       for (path <- paths) {
         path.pathNodes().filter(node => !node.isTrivialEnd).foreach(node =>
-          candidates + TypeEntity(node.pos, satisfiableCounts(node.pos))
+          candidates = candidates + TypeEntity(node.pos, satisfiableCounts(node.pos))
         )
       }
 
