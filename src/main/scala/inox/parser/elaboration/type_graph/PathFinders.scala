@@ -52,7 +52,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
       if (from.isTrivialEnd || to.isTrivialEnd)
         return true
 
-      from.accept(to)
+      to.accept(from)
     }
 
     /**
@@ -140,6 +140,9 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
         return false
 
       if (firstInPath() entityInformationEquality lastInPath())
+        return false
+
+      if (lastInPath() accept firstInPath())
         return false
 
 
@@ -482,7 +485,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 //      }
     }
 
-    def addMoreEdges(edge: LessEqual) = {
+    def addMoreEdges(edge: LessEqual): Unit = {
       val from = edge.from
       val to = edge.to
 
@@ -539,10 +542,10 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
         // tryAddingExtraEdges, without constructors
 
-        edge match {
-          case a: LessEqual => addMoreEdges(a)
-          case _ => ()
-        }
+//        edge match {
+//          case a: LessEqual => addMoreEdges(a)
+//          case _ => ()
+//        }
 
         for (node <- allNodes) {
           edge match {

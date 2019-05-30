@@ -71,9 +71,12 @@ trait Elements {
     *
     * @param tpe of the entity
     */
-  class TypeElement(val tpe: SimpleTypes.Type) extends Element {
+  case class TypeElement(tpe: SimpleTypes.Type) extends Element {
     override def equals(obj: Any): Boolean = obj match {
-      case other: TypeElement => other.tpe == tpe && other.tpe.pos == tpe.pos
+      case other: TypeElement => (tpe, other.tpe) match {
+        case (first: SimpleTypes.Unknown, second: SimpleTypes.Unknown) => first == second
+        case _ => tpe == other.tpe && position == other.position
+      }
       case _ => false
     }
 
@@ -92,7 +95,7 @@ trait Elements {
     * @param typeClass of the entity
     * @param pos       where this entity is found in the source
     */
-  class TypeClassElement(val typeClass: TypeClasses.TypeClass, val pos: Position) extends Element {
+  case class TypeClassElement(typeClass: TypeClasses.TypeClass, pos: Position) extends Element {
     override def equals(obj: Any): Boolean = obj match {
       case other: TypeClassElement => other.typeClass == typeClass && other.pos == pos
       case _ => false

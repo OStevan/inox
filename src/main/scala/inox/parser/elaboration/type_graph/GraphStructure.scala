@@ -43,6 +43,11 @@ trait GraphStructure {
     def accept(other: Node): Boolean = entity.accept(other.entity)
 
     def pos: Position = entity.position
+
+    override def equals(obj: Any): Color = obj match {
+      case Node(ent, _) => ent == this.entity
+      case _ => false
+    }
   }
 
   trait Edge {

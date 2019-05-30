@@ -12,7 +12,7 @@ class ConstructorTests extends FunSuite {
 
    test("lambda type detected as wrong") {
      try {
-       fd"def rep(n: Int): Int => Int = if (n == 0) lambda (x) => 'bla' else lambda (x: Char) => x"
+       fd"def rep(n: Int): Int => Int = if (n == 0) lambda (x: Char) => x else lambda (x: Int) => x"
        fail("No errors detected, while there should be one")
      } catch {
        case InterpolatorException(text) =>
