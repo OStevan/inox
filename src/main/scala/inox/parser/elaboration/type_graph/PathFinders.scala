@@ -46,22 +46,13 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
       * @return
       */
     private def leq(from: Node, to: Node): Boolean = {
-      if (from nodeInformationEquality to)
+      if (from entityInformationEquality  to)
         return true
 
       if (from.isTrivialEnd || to.isTrivialEnd)
         return true
 
-      (from, to) match {
-        case (Nodes.TypeClassNode(fromTpeClass), Nodes.TypeClassNode(toTpeClass)) =>
-          // TODO this currently wrong, check with Romain what to do here
-          false
-        case (Nodes.TypeNode(tpe, _), Nodes.TypeClassNode(tpeClass)) => tpeClass.accepts(tpe) match {
-          case None => false
-          case _ => true
-        }
-        case _ => false
-      }
+      from.accept(to)
     }
 
     /**
@@ -80,7 +71,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
 
       // TODO finish this
-      if (from nodeInformationEquality  to)
+      if (from entityInformationEquality   to)
         return true
 
       // TODO add for constructors
@@ -111,7 +102,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
       if (edges.length == 0)
         return false
 
-      if (firstInPath() nodeInformationEquality lastInPath())
+      if (firstInPath() entityInformationEquality lastInPath())
         return true
 
       leq(firstInPath(), lastInPath())
@@ -148,7 +139,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
       if (edges.length == 0)
         return false
 
-      if (firstInPath() nodeInformationEquality lastInPath())
+      if (firstInPath() entityInformationEquality lastInPath())
         return false
 
 
@@ -348,7 +339,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
     // edge inference
     override def inferLeqEdge(from: Node, to: Node, length: Int, evidence: List[Evidence], atomic: Boolean): Unit = {
       addNextHop(from, to, evidence)
-      if (from nodeInformationEquality to)
+      if (from entityInformationEquality to)
         return
       queue.enqueue(LessEqual(from, to, length))
       setShortestLeq(from, to, length)
@@ -411,7 +402,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
       * @param to node edging the new edge
       */
     private def ruleLeqLeq(from: Node, mid: Node, to: Node): Unit = {
-      if (from nodeInformationEquality to)
+      if (from entityInformationEquality to)
         return
       val leftDistance = getShortestLeq(from, mid)
       val rightDistance = getShortestLeq(mid, to)
@@ -427,7 +418,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
     }
 
     def ruleLeftLeq(from: Node, mid: Node, to: Node, position: Int): Unit = {
-      if (from nodeInformationEquality  to)
+      if (from entityInformationEquality to)
         return
       val leftDistance = getShortestLeft(from, mid, position)
       val rightDistance = getShortestLeq(mid, to)
@@ -449,7 +440,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
     }
 
     def ruleLeftRight(from: Node, mid: Node, to: Node, position: Int): Unit = {
-      if (from nodeInformationEquality to)
+      if (from entityInformationEquality to)
         return
 
       val leftDistance = getShortestLeft(from, mid, position)
@@ -464,44 +455,31 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
     }
 
-    def compatibleConstructors(constructorFrom: Node, constructorTo: Node): Boolean = (constructorFrom, constructorTo) match {
-      case (_: Nodes.TypeClassNode, _) => false
-      case (_, _: Nodes.TypeClassNode) => false
-      case (Nodes.TypeNode(tpeFrom, _), Nodes.TypeNode(tpeTo, _)) => (tpeFrom, tpeTo) match {
-        case (_:SimpleTypes.BagType, _: SimpleTypes.BagType) => true
-        case (_: SimpleTypes.SetType, _: SimpleTypes.SetType) => true
-        case (_: SimpleTypes.MapType, _: SimpleTypes.MapType) => true
-        case (_: SimpleTypes.TupleType, _: SimpleTypes.TupleType) => true
-        case (SimpleTypes.FunctionType(firstFroms, _), SimpleTypes.FunctionType(secondFroms, _)) if firstFroms.length == secondFroms.length =>
-          true
-        case (SimpleTypes.ADTType(_, firstArgs), SimpleTypes.ADTType(_, secondArgs)) if firstArgs.length == secondArgs.length =>
-          true
-        case _ => false
-      }
-    }
+    def compatibleConstructors(constructorFrom: Node, constructorTo: Node): Boolean =
+      constructorFrom.compatibleConstuctors(constructorTo)
 
 
     // TODO change this to use elements
     def expandNode(original: Node, subst: Node, equal: LessEqual) = {
-      if (constructorNodes.contains(original) && original.color == Black && subst.color == Black) {
-        constructorNodes(original).foreach(constructorNode => if (constructorNode.color == Black || !trace(constructorNode).contains(equal)) {
-          assert(constructorNode.isInstanceOf[Nodes.TypeNode])
-          assert(original.isInstanceOf[Nodes.TypeNode])
-          assert(subst.isInstanceOf[Nodes.TypeNode])
-          val replaced: List[Node] = replace(constructorNode.asInstanceOf[Nodes.TypeNode].tpe,
-            original.asInstanceOf[Nodes.TypeNode], subst.asInstanceOf[Nodes.TypeNode].tpe)
-          replaced.foreach(newNode => if (!graph.containsColorAgnostic(newNode)) {
-            graph = graph union ConstraintGraph.apply(newNode)
-            if (constructorNode.color == White)
-              trace = trace.updated(newNode, trace(constructorNode) + equal)
-            else
-              trace = trace.updated(newNode, Set.empty + equal)
-
-            // change this to use elements
-            initTablesFor()
-          })
-        })
-      }
+//      if (constructorNodes.contains(original) && original.color == Black && subst.color == Black) {
+//        constructorNodes(original).foreach(constructorNode => if (constructorNode.color == Black || !trace(constructorNode).contains(equal)) {
+//          assert(constructorNode.isInstanceOf[Nodes.TypeNode])
+//          assert(original.isInstanceOf[Nodes.TypeNode])
+//          assert(subst.isInstanceOf[Nodes.TypeNode])
+//          val replaced: List[Node] = replace(constructorNode.asInstanceOf[Nodes.TypeNode].tpe,
+//            original.asInstanceOf[Nodes.TypeNode], subst.asInstanceOf[Nodes.TypeNode].tpe)
+//          replaced.foreach(newNode => if (!graph.containsColorAgnostic(newNode)) {
+//            graph = graph union Graph.apply(newNode)
+//            if (constructorNode.color == White)
+//              trace = trace.updated(newNode, trace(constructorNode) + equal)
+//            else
+//              trace = trace.updated(newNode, Set.empty + equal)
+//
+//            // change this to use elements
+//            initTablesFor()
+//          })
+//        })
+//      }
     }
 
     def addMoreEdges(edge: LessEqual) = {

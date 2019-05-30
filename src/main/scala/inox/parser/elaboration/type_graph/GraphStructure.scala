@@ -2,102 +2,47 @@ package inox.parser.elaboration.type_graph
 
 import inox.parser.elaboration.{Constraints, SimpleTypes}
 
-import scala.collection.mutable
-import scala.util.parsing.input.{Position, Positional}
+import scala.util.parsing.input.Position
 
-trait GraphStructure { self: SimpleTypes with Constraints =>
+trait GraphStructure {
+  self: Elements with SimpleTypes with Constraints =>
 
-  import Constraints._
   import Edges._
-  import Nodes._
-  import SimpleTypes._
-  import TypeClasses._
+  import Constraints._
 
   type Color = Boolean
   val Black: Color = true
   val White: Color = false
 
-  trait Node extends Positional {
+  case class Node(entity: Element, color: Color = Black) {
+    def compatibleConstuctors(constructorTo: Node): Boolean = entity.compatibleConstructors(constructorTo.entity)
+
     private var counter: Int = 0
 
-    val color: Boolean
-
     /**
-      * Tests if two nodes have the same type information
-      * @param other node to compare with
-      * @return flag if the information inside is the same
+      * Test if the information inside the nodes is the same, basically type equality of typeclass equality
+      *
+      * @param other node with which to compare
+      * @return
       */
-    def nodeInformationEquality(other: Node): Boolean = (this, other) match {
-      case (first: TypeNode, second: TypeNode) => first.tpe == second.tpe
-      case (_: TypeNode, _: TypeClassNode) => false
-      case (first: TypeClassNode, second: TypeClassNode) => first.typeClass == second.typeClass
-      case _ => false
-    }
-
-    def withPosition(pos: Position): Node = this match {
-      case TypeNode(tpe, `color`) => TypeNode(tpe, color).setPos(pos)
-      case TypeClassNode(tpeClass) => TypeClassNode(tpeClass).setPos(pos)
-    }
+    def entityInformationEquality(other: Node): Boolean = entity.informationEquality(other.entity)
 
     def incSatisfiableCount(): Unit = counter = counter + 1
 
     def satisfiableCount(): Int = counter
 
-    def hasVars: Boolean
+    def hasVars: Boolean = entity.hasVars
 
-    def isTrivialEnd: Boolean
+    def isTrivialEnd: Boolean = entity.isTrivialEnd
 
-    override def equals(obj: Any): Boolean
-  }
+    /**
+      * Checks if this node can accept other node, basically used for type classes
+      * @param other node to accept
+      * @return flag if this Node accepts the other
+      */
+    def accept(other: Node): Boolean = entity.accept(other.entity)
 
-  object Nodes {
-
-    case class TypeNode(tpe: SimpleTypes.Type, color: Color = Black) extends Node {
-
-      setPos(tpe.pos)
-
-      override def equals(obj: Any): Boolean = obj match {
-        case TypeNode(other: Unknown, _) => other == tpe
-        case other: TypeNode => tpe == other.tpe && pos == other.pos
-        case _ => false
-      }
-
-      override def isTrivialEnd: Boolean = tpe match {
-        case _: SimpleTypes.Unknown => true
-        case _ => false
-
-      }
-
-      override def hasVars: Boolean = {
-        def hasVarsHelper(tpe: SimpleTypes.Type): Boolean = tpe match {
-          case _: Unknown => true
-          case _: TypeParameter => true
-          case ADTType(_, args) => args.exists(tpe => hasVarsHelper(tpe))
-          case FunctionType(froms, to) => froms.exists(tpe => hasVarsHelper(tpe)) && hasVarsHelper(to)
-          case TupleType(elems) => elems.exists(tpe => hasVarsHelper(tpe))
-          case MapType(from, to) => hasVarsHelper(from) || hasVarsHelper(to)
-          case BagType(elem) => hasVarsHelper(elem)
-          case SetType(elem) => hasVarsHelper(elem)
-          case _ => false
-        }
-
-        hasVarsHelper(tpe)
-      }
-    }
-
-    case class TypeClassNode private(typeClass: TypeClass) extends Node {
-
-      val color: Boolean = White
-
-      override def isTrivialEnd: Boolean = false
-
-      override def hasVars: Boolean = false
-
-      override def equals(obj: Any): Boolean = obj match {
-        case other: TypeClassNode => (typeClass == other.typeClass) && (pos == other.pos)
-        case _ => false
-      }
-    }
+    def pos: Position = entity.position
   }
 
   trait Edge {
@@ -132,52 +77,30 @@ trait GraphStructure { self: SimpleTypes with Constraints =>
 
   }
 
-  trait Graph {
-    def nodes: Set[Node]
+  case class Graph private(nodeEdgesMap: Map[Node, Set[Edge]], edges: Set[Edge], elementNodeMap: Map[Element, Node]) {
 
-    def edges: Set[Edge]
-
-    def union(other: Graph): Graph
-
-    def nodeEdgesMap: Map[Node, Set[Edge]]
-  }
-
-  case class ConstraintGraph private(nodeEdgesMap: Map[Node, Set[Edge]], edges: Set[Edge]) extends Graph {
-
-    override def nodes: Set[Node] = nodeEdgesMap.keySet
+    def nodes: Set[Node] = nodeEdgesMap.keySet
 
     def this(nodes: Set[Node], edges: Set[Edge]) {
-      this(ConstraintGraph.makeNodeEdgesMap(nodes, edges), edges)
+      this(Graph.makeNodeEdgesMap(nodes, edges), edges, Graph.maleElementNodeMap(nodes))
     }
 
-    override def union(other: Graph): Graph = other match {
-      case other: ConstraintGraph =>
-        ConstraintGraph(this.nodeEdgesMap.keySet union other.nodeEdgesMap.keySet, this.edges union other.edges)
-    }
+    def union(other: Graph): Graph = new Graph(this.nodeEdgesMap.keySet union other.nodeEdgesMap.keySet, this.edges union other.edges)
 
-    def union(other: ConstraintGraph): ConstraintGraph =
-      ConstraintGraph(this.nodeEdgesMap.keySet union other.nodeEdgesMap.keySet, this.edges union other.edges)
-
-    def addEdge(edge: Edge): ConstraintGraph = {
+    def addEdge(edge: Edge): Graph = {
       edge match {
         case LessEqualEdge(from, to) =>
           assert(nodeEdgesMap.keySet.contains(from) && nodeEdgesMap.keySet.contains(to))
-          new ConstraintGraph(nodeEdgesMap.updated(from, nodeEdgesMap.getOrElse(from, Set()) + edge), edges + edge)
+          new Graph(nodeEdgesMap.updated(from, nodeEdgesMap.getOrElse(from, Set()) + edge), edges + edge, elementNodeMap)
         case ConstructorEdge(from, to, _, _) =>
           assert(nodeEdgesMap.keySet.contains(from) && nodeEdgesMap.keySet.contains(to))
-          new ConstraintGraph(nodeEdgesMap.updated(from, nodeEdgesMap.getOrElse(from, Set()) + edge), edges + edge)
+          new Graph(nodeEdgesMap.updated(from, nodeEdgesMap.getOrElse(from, Set()) + edge), edges + edge, elementNodeMap)
       }
     }
   }
 
-  object ConstraintGraph {
-    def apply(nodes: Set[Node], edges: Set[Edge]): ConstraintGraph = new ConstraintGraph(nodes, edges)
-
-    def apply(node: Node): ConstraintGraph = new ConstraintGraph(Set(node), Set.empty[Edge])
-
-    def apply(edge: Edge): ConstraintGraph = new ConstraintGraph(Set.empty[Node], Set(edge))
-
-    def empty(): ConstraintGraph = ConstraintGraph(Set.empty[Node], Set.empty[Edge])
+  object Graph {
+    private def maleElementNodeMap(nodes: Set[Node]): Map[Element, Node] = nodes.map(elem => (elem.entity, elem)).toMap
 
     private def makeNodeEdgesMap(nodes: Set[Node], edges: Set[Edge]): Map[Node, Set[Edge]] = {
       var nodeEdgesMap: Map[Node, Set[Edge]] = Map.empty
@@ -188,156 +111,169 @@ trait GraphStructure { self: SimpleTypes with Constraints =>
         case edge: LessEqualEdge => nodeEdgesMap = nodeEdgesMap.updated(edge.from, nodeEdgesMap.getOrElse(edge.from, Set()) + edge)
         case edge: ConstructorEdge => nodeEdgesMap = nodeEdgesMap.updated(edge.from, nodeEdgesMap.getOrElse(edge.from, Set()) + edge)
       }
-
+      
       nodeEdgesMap
     }
   }
 
-
-  def constructSeq(constraints: Seq[Constraint]): ConstraintGraph =
-    constraints.map((constraint: Constraint) => construct(constraint)).foldLeft(ConstraintGraph.empty()) {
-      case (acc, graph) => acc union graph
+  def constructSeq(constraints: Seq[Constraint]): Graph = {
+    val (nodes, edges) = constraints.map((constraint: Constraint) => construct(constraint)).foldLeft((Set.empty[Node], Set.empty[Edge])) {
+      case (acc, graph) => (acc._1 union graph._1, acc._2 union graph._2)
     }
 
-  def construct(constraint: Constraint): ConstraintGraph = constraint match {
+    new Graph(nodes, edges)
+  }
+
+  def construct(constraint: Constraint): (Set[Node], Set[Edge]) = constraint match {
     case Equals(left, right) =>
-      val (leftNode: Node, leftGraph: ConstraintGraph) = construct(left)
-      val (rightNode: Node, rightGraph: ConstraintGraph) = construct(right)
-      leftGraph union rightGraph union new ConstraintGraph(Set[Node](),
-        Set(
+      val (leftNode: Node, leftGraph) = construct(left)
+      val (rightNode: Node, rightGraph) = construct(right)
+      (
+        leftGraph._1 union rightGraph._1,
+        leftGraph._2 union rightGraph._2 union Set(
           LessEqualEdge(leftNode, rightNode),
           LessEqualEdge(rightNode, leftNode)
         ))
     case HasClass(elem, typeClass) =>
       val (elemNode, elemGraph) = construct(elem)
-      val typeClassNode = TypeClassNode(typeClass).withPosition(constraint.pos)
-      elemGraph union ConstraintGraph(typeClassNode) union ConstraintGraph(LessEqualEdge(elemNode, typeClassNode))
+      val typeClassNode = Node(new TypeClassElement(typeClass, constraint.pos), Black)
+      (
+        elemGraph._1 + typeClassNode,
+        elemGraph._2 + LessEqualEdge(elemNode, typeClassNode)
+      )
     case _ =>
       // ignore exists currently
-      ConstraintGraph.empty()
+      (Set.empty, Set.empty)
   }
 
-  def construct(tpe: SimpleTypes.Type): (Node, ConstraintGraph) = tpe match {
+  def construct(tpe: SimpleTypes.Type): (Node, (Set[Node], Set[Edge])) = tpe match {
     case SimpleTypes.FunctionType(froms, to) =>
       val (toNode, toGraph) = construct(to)
-      val funNode = TypeNode(tpe).withPosition(tpe.pos)
+      val funNode = Node(new TypeElement(tpe))
 
-      val startGraph = (ConstraintGraph(funNode)
-        union toGraph
-        union ConstraintGraph(ConstructorEdge(toNode, funNode, ConstructorEdgeDirection.Original, froms.length))
-        union ConstraintGraph(ConstructorEdge(funNode, toNode, ConstructorEdgeDirection.Decompositional, froms.length))
-        )
+      val startGraph = (
+        toGraph._1 + funNode, // node union
+        toGraph._2 union Set( // edge union
+          ConstructorEdge(toNode, funNode, ConstructorEdgeDirection.Original, froms.length),
+          ConstructorEdge(funNode, toNode, ConstructorEdgeDirection.Decompositional, froms.length)
+        ))
 
       (funNode,
         froms.foldLeft((0, startGraph))((pair, elem) => {
           val (elemNode, elemGraph) = construct(elem)
-          (pair._1 + 1, pair._2
-            union elemGraph
-            union ConstraintGraph(ConstructorEdge(elemNode, funNode, ConstructorEdgeDirection.Original, pair._1))
-            union ConstraintGraph(ConstructorEdge(funNode, elemNode, ConstructorEdgeDirection.Decompositional, pair._1)))
+          (pair._1 + 1, (
+            pair._2._1 union elemGraph._1, // node union
+            pair._2._2 union elemGraph._2 union // edge union
+              Set(ConstructorEdge(elemNode, funNode, ConstructorEdgeDirection.Original, pair._1),
+                ConstructorEdge(funNode, elemNode, ConstructorEdgeDirection.Decompositional, pair._1)))
+          )
 
         })._2
       )
     case SimpleTypes.TupleType(elems) =>
-      val tupleType = TypeNode(tpe).withPosition(tpe.pos)
-      (tupleType,
-        elems.foldLeft((0, ConstraintGraph(tupleType)))((pair, elem) => {
-          val (elemNode, elemGraph) = construct(elem)
-          (pair._1 + 1, pair._2
-            union elemGraph
-            union ConstraintGraph(ConstructorEdge(elemNode, tupleType, ConstructorEdgeDirection.Original, pair._1))
-            union ConstraintGraph(ConstructorEdge(tupleType, elemNode, ConstructorEdgeDirection.Decompositional, pair._1)))
+      val tupleType = Node(new TypeElement(tpe))
 
+      (tupleType,
+        elems.foldLeft((0, (Set(tupleType), Set.empty[Edge])))((pair, elem) => {
+          val (elemNode, elemGraph) = construct(elem)
+          (pair._1 + 1, (
+            pair._2._1 union elemGraph._1,
+            pair._2._2 union elemGraph._2 union Set(
+              ConstructorEdge(elemNode, tupleType, ConstructorEdgeDirection.Original, pair._1),
+              ConstructorEdge(tupleType, elemNode, ConstructorEdgeDirection.Decompositional, pair._1)))
+          )
         })._2
       )
     case SimpleTypes.BagType(elemType) =>
-      val bagNode = TypeNode(tpe).withPosition(tpe.pos)
+      val bagNode = Node(new TypeElement(tpe))
       val (elemNode, elemGraph) = construct(elemType)
-      (bagNode,
-        ConstraintGraph(bagNode)
-          union elemGraph
-          union ConstraintGraph(ConstructorEdge(elemNode, bagNode, ConstructorEdgeDirection.Original, 0))
-          union ConstraintGraph(ConstructorEdge(bagNode, elemNode, ConstructorEdgeDirection.Decompositional, 0))
-      )
+      (bagNode, (
+        elemGraph._1 + bagNode,
+        elemGraph._2 union Set(
+          ConstructorEdge(elemNode, bagNode, ConstructorEdgeDirection.Original, 0),
+          ConstructorEdge(bagNode, elemNode, ConstructorEdgeDirection.Decompositional, 0)
+        )
+      ))
     case SimpleTypes.SetType(elemType) =>
-      val setNode = TypeNode(tpe).withPosition(tpe.pos)
+      val setNode = Node(new TypeElement(tpe))
       val (elemNode, elemGraph) = construct(elemType)
-      (setNode,
-        ConstraintGraph(setNode)
-          union elemGraph
-          union ConstraintGraph(ConstructorEdge(elemNode, setNode, ConstructorEdgeDirection.Original, 0))
-          union ConstraintGraph(ConstructorEdge(setNode, elemNode, ConstructorEdgeDirection.Decompositional, 0))
-      )
+      (setNode, (
+        elemGraph._1 + setNode,
+        elemGraph._2 union Set(
+          ConstructorEdge(elemNode, setNode, ConstructorEdgeDirection.Original, 0),
+          ConstructorEdge(setNode, elemNode, ConstructorEdgeDirection.Decompositional, 0)
+        )
+      ))
     case SimpleTypes.ADTType(_, args) =>
-      val adtNode = TypeNode(tpe).withPosition(tpe.pos)
+      val adtNode = Node(new TypeElement(tpe))
       (adtNode,
-        args.foldLeft((0, ConstraintGraph(adtNode)))((pair, elem) => {
+        args.foldLeft((0, (Set(adtNode), Set.empty[Edge])))((pair, elem) => {
           val (elemNode, elemGraph) = construct(elem)
-          (pair._1 + 1, pair._2
-            union elemGraph
-            union ConstraintGraph(ConstructorEdge(elemNode, adtNode, ConstructorEdgeDirection.Original, pair._1))
-            union ConstraintGraph(ConstructorEdge(adtNode, elemNode, ConstructorEdgeDirection.Decompositional, pair._1)))
-
+          (pair._1 + 1, (
+            pair._2._1 union elemGraph._1,
+            pair._2._2 union elemGraph._2 union Set(
+              ConstructorEdge(elemNode, adtNode, ConstructorEdgeDirection.Original, pair._1),
+              ConstructorEdge(adtNode, elemNode, ConstructorEdgeDirection.Decompositional, pair._1)))
+          )
         })._2
       )
     case SimpleTypes.MapType(from, to) =>
       val (fromNode, fromGraph) = construct(from)
       val (toNode, toGraph) = construct(to)
-      val mapNode = TypeNode(tpe).withPosition(tpe.pos)
+      val mapNode = Node(new TypeElement(tpe))
       (mapNode,
-        ConstraintGraph(mapNode)
-          union fromGraph
-          union toGraph
-          union ConstraintGraph(ConstructorEdge(fromNode, mapNode, ConstructorEdgeDirection.Original, 0))
-          union ConstraintGraph(ConstructorEdge(mapNode, fromNode, ConstructorEdgeDirection.Decompositional, 0))
-          union ConstraintGraph(ConstructorEdge(toNode, mapNode, ConstructorEdgeDirection.Original, 1))
-          union ConstraintGraph(ConstructorEdge(mapNode, toNode, ConstructorEdgeDirection.Decompositional, 1))
+        (fromGraph._1 union toGraph._1 + mapNode,
+          fromGraph._2 union toGraph._2 union Set(
+            ConstructorEdge(fromNode, mapNode, ConstructorEdgeDirection.Original, 0),
+            ConstructorEdge(mapNode, fromNode, ConstructorEdgeDirection.Decompositional, 0),
+            ConstructorEdge(toNode, mapNode, ConstructorEdgeDirection.Original, 1),
+            ConstructorEdge(mapNode, toNode, ConstructorEdgeDirection.Decompositional, 1))
+        )
       )
-    case a: SimpleTypes.Type => (TypeNode(a).withPosition(tpe.pos),
-      new ConstraintGraph(Set[Node](TypeNode(a).withPosition(tpe.pos)), Set.empty))
+    case a: SimpleTypes.Type =>
+      val node = Node(new TypeElement(tpe))
+      (node, (Set(node), Set.empty[Edge]))
   }
 
-  def saturate(graph: Graph): Graph = graph match {
-    case g: ConstraintGraph => saturate(g)
-  }
-
-  def saturate(graph: ConstraintGraph): ConstraintGraph = {
-    var resultGraph = graph
-    val workList: mutable.Queue[Either[Edge, (ConstructorEdge, LessEqualEdge)]] = mutable.Queue() ++ graph.edges.map(a => Left(a))
-    while (workList.nonEmpty) {
-      val current = workList.dequeue()
-      current match {
-        case Left(edge: LessEqualEdge) =>
-          graph.nodeEdgesMap.getOrElse(edge.to, Set()).foreach {
-            case chain: LessEqualEdge =>
-              val transitive = LessEqualEdge(edge.from, chain.to)
-              workList.enqueue(Left(transitive))
-              resultGraph = resultGraph.addEdge(transitive)
-            case _ =>
-              ()
-          }
-        case Left(edge@ConstructorEdge(_, to, ConstructorEdgeDirection.Original, _)) =>
-          graph.nodeEdgesMap.getOrElse(to, Set()).foreach {
-            case chain: LessEqualEdge =>
-              workList.enqueue(Right((edge, chain)))
-            case _ =>
-              ()
-          }
-        case Right((constructor, lessEqual)) =>
-          graph.nodeEdgesMap.getOrElse(lessEqual.to, Set()).foreach {
-            case ConstructorEdge(_, to, ConstructorEdgeDirection.Decompositional, position) if position == constructor.position =>
-              val created = LessEqualEdge(constructor.from, to)
-              workList.enqueue(Left(created))
-              resultGraph = resultGraph.addEdge(created)
-            case _ =>
-              ()
-          }
-      }
-    }
-    resultGraph
-  }
-
-
+  //  def saturate(graph: Graph): Graph = graph match {
+  //    case g: Graph => saturate(g)
+  //  }
+  //
+  //  def saturate(graph: Graph): Graph = {
+  //    var resultGraph = graph
+  //    val workList: mutable.Queue[Either[Edge, (ConstructorEdge, LessEqualEdge)]] = mutable.Queue() ++ graph.edges.map(a => Left(a))
+  //    while (workList.nonEmpty) {
+  //      val current = workList.dequeue()
+  //      current match {
+  //        case Left(edge: LessEqualEdge) =>
+  //          graph.nodeEdgesMap.getOrElse(edge.to, Set()).foreach {
+  //            case chain: LessEqualEdge =>
+  //              val transitive = LessEqualEdge(edge.from, chain.to)
+  //              workList.enqueue(Left(transitive))
+  //              resultGraph = resultGraph.addEdge(transitive)
+  //            case _ =>
+  //              ()
+  //          }
+  //        case Left(edge@ConstructorEdge(_, to, ConstructorEdgeDirection.Original, _)) =>
+  //          graph.nodeEdgesMap.getOrElse(to, Set()).foreach {
+  //            case chain: LessEqualEdge =>
+  //              workList.enqueue(Right((edge, chain)))
+  //            case _ =>
+  //              ()
+  //          }
+  //        case Right((constructor, lessEqual)) =>
+  //          graph.nodeEdgesMap.getOrElse(lessEqual.to, Set()).foreach {
+  //            case ConstructorEdge(_, to, ConstructorEdgeDirection.Decompositional, position) if position == constructor.position =>
+  //              val created = LessEqualEdge(constructor.from, to)
+  //              workList.enqueue(Left(created))
+  //              resultGraph = resultGraph.addEdge(created)
+  //            case _ =>
+  //              ()
+  //          }
+  //      }
+  //    }
+  //    resultGraph
+  //  }
 
 
 }

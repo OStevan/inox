@@ -3,14 +3,19 @@ package inox.parser.elaboration.type_graph
 import inox.parser.ElaborationErrors
 import inox.parser.elaboration.{Constraints, SimpleTypes}
 
-trait TypeGraphAnalysis extends GraphStructure with ErrorReasons with ErrorInferencers with PathFinders with ErrorReasonSearch{
-  self: SimpleTypes with Constraints  with ElaborationErrors =>
+trait TypeGraphAnalysis extends GraphStructure
+  with ErrorReasons
+  with ErrorInferencers
+  with PathFinders
+  with ErrorReasonSearch
+  with Elements {
+  self: SimpleTypes with Constraints with ElaborationErrors =>
 
 
   class ConstraintGraphAnalysis {
 
 
-    private def getPathFinder(graph: ConstraintGraph): PathFinder = {
+    private def getPathFinder(graph: Graph): PathFinder = {
       new ShortestPathFinder(graph)
     }
 
@@ -38,7 +43,7 @@ trait TypeGraphAnalysis extends GraphStructure with ErrorReasons with ErrorInfer
         List()
     }
 
-    def generateErrorPaths(graph: ConstraintGraph): List[GraphPath] = {
+    def generateErrorPaths(graph: Graph): List[GraphPath] = {
       var unsatisfiable: List[GraphPath] = List()
 
       val finder = getPathFinder(graph)
@@ -59,7 +64,7 @@ trait TypeGraphAnalysis extends GraphStructure with ErrorReasons with ErrorInfer
   }
 
 
-  class GraphDiagnosis(val graph: ConstraintGraph) {
+  class GraphDiagnosis(val graph: Graph) {
 
     private val constraintGraphAnalysis: ConstraintGraphAnalysis = new ConstraintGraphAnalysis
 
@@ -89,4 +94,5 @@ trait TypeGraphAnalysis extends GraphStructure with ErrorReasons with ErrorInfer
       new GraphDiagnosis(graph)
     }
   }
+
 }

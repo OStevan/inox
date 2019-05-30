@@ -7,8 +7,6 @@ import scala.util.parsing.input.Position
 trait ErrorInferencers {
   self: PathFinders with ErrorReasons with ErrorReasonSearch with GraphStructure with SimpleTypes=>
 
-  import Nodes._
-
   abstract class ErrorInference(val paths: Seq[GraphPath]) {
 
 
@@ -51,16 +49,9 @@ trait ErrorInferencers {
       var candidates: Set[Entity] = Set.empty
 
       for (path <- paths) {
-        for (node <- path.pathNodes()) {
-          node match {
-            // ignore Unknowns
-            case n: TypeNode => n.tpe match {
-              case _ : SimpleTypes.Unknown => ()
-              case _ => candidates = candidates + TypeEntity(node.pos, satisfiableCounts(node.pos))
-            }
-            case _ => candidates = candidates + TypeEntity(node.pos, satisfiableCounts(node.pos))
-          }
-        }
+        path.pathNodes().filter(node => !node.isTrivialEnd).foreach(node =>
+          candidates + TypeEntity(node.pos, satisfiableCounts(node.pos))
+        )
       }
 
       candidates
