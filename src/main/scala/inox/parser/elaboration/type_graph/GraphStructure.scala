@@ -20,6 +20,8 @@ trait GraphStructure { self: SimpleTypes with Constraints =>
   trait Node extends Positional {
     private var counter: Int = 0
 
+    val color: Boolean
+
     /**
       * Tests if two nodes have the same type information
       * @param other node to compare with
@@ -33,8 +35,8 @@ trait GraphStructure { self: SimpleTypes with Constraints =>
     }
 
     def withPosition(pos: Position): Node = this match {
-      case TypeNode(tpe, color) => TypeNode(tpe, color).setPos(pos)
-      case TypeClassNode(tpeClass, color) => TypeClassNode(tpeClass, color).setPos(pos)
+      case TypeNode(tpe, `color`) => TypeNode(tpe, color).setPos(pos)
+      case TypeClassNode(tpeClass) => TypeClassNode(tpeClass).setPos(pos)
     }
 
     def incSatisfiableCount(): Unit = counter = counter + 1
@@ -83,7 +85,10 @@ trait GraphStructure { self: SimpleTypes with Constraints =>
       }
     }
 
-    case class TypeClassNode private(typeClass: TypeClass, color: Color = Black) extends Node {
+    case class TypeClassNode private(typeClass: TypeClass) extends Node {
+
+      val color: Boolean = White
+
       override def isTrivialEnd: Boolean = false
 
       override def hasVars: Boolean = false
@@ -205,7 +210,7 @@ trait GraphStructure { self: SimpleTypes with Constraints =>
         ))
     case HasClass(elem, typeClass) =>
       val (elemNode, elemGraph) = construct(elem)
-      val typeClassNode = TypeClassNode(typeClass, White).withPosition(constraint.pos)
+      val typeClassNode = TypeClassNode(typeClass).withPosition(constraint.pos)
       elemGraph union ConstraintGraph(typeClassNode) union ConstraintGraph(LessEqualEdge(elemNode, typeClassNode))
     case _ =>
       // ignore exists currently
