@@ -14,8 +14,10 @@ trait GraphStructure {
   val Black: Color = true
   val White: Color = false
 
-  case class Node(entity: Element, color: Color = Black) {
-    def compatibleConstuctors(constructorTo: Node): Boolean = entity.compatibleConstructors(constructorTo.entity)
+  case class Node(element: Element, color: Color = Black) {
+    def isConstructor: Boolean = element.isConstructor
+
+    def compatibleConstructors(constructorTo: Node): Boolean = element.compatibleConstructors(constructorTo.element)
 
     private var counter: Int = 0
 
@@ -25,27 +27,28 @@ trait GraphStructure {
       * @param other node with which to compare
       * @return
       */
-    def entityInformationEquality(other: Node): Boolean = entity.informationEquality(other.entity)
+    def entityInformationEquality(other: Node): Boolean = element.informationEquality(other.element)
 
     def incSatisfiableCount(): Unit = counter = counter + 1
 
     def satisfiableCount(): Int = counter
 
-    def hasVars: Boolean = entity.hasVars
+    def hasVars: Boolean = element.hasVars
 
-    def isTrivialEnd: Boolean = entity.isTrivialEnd
+    def isTrivialEnd: Boolean = element.isTrivialEnd
 
     /**
       * Checks if this node can accept other node, basically used for type classes
+      *
       * @param other node to accept
       * @return flag if this Node accepts the other
       */
-    def accept(other: Node): Boolean = entity.accept(other.entity)
+    def accept(other: Node): Boolean = element.accept(other.element)
 
-    def pos: Position = entity.position
+    def pos: Position = element.position
 
     override def equals(obj: Any): Color = obj match {
-      case Node(ent, _) => ent == this.entity
+      case Node(ent, _) => ent == this.element
       case _ => false
     }
   }
@@ -83,6 +86,22 @@ trait GraphStructure {
   }
 
   case class Graph private(nodeEdgesMap: Map[Node, Set[Edge]], edges: Set[Edge], elementNodeMap: Map[Element, Node]) {
+    def addBlackNode(element: Element): (Graph, Node) =
+      if (elementNodeMap.contains(element)) {
+        (this, elementNodeMap(element))
+      } else {
+        val newNode = Node(element)
+        (new Graph(nodes + newNode, edges), newNode)
+      }
+
+    def addWhiteNode(element: Element): (Graph, Node) =
+      if (elementNodeMap.contains(element)) {
+        (this, elementNodeMap(element))
+      } else {
+        val newNode = Node(element, White)
+        (new Graph(nodes + newNode, edges), newNode)
+      }
+
 
     def nodes: Set[Node] = nodeEdgesMap.keySet
 
@@ -105,7 +124,7 @@ trait GraphStructure {
   }
 
   object Graph {
-    private def maleElementNodeMap(nodes: Set[Node]): Map[Element, Node] = nodes.map(elem => (elem.entity, elem)).toMap
+    private def maleElementNodeMap(nodes: Set[Node]): Map[Element, Node] = nodes.map(elem => (elem.element, elem)).toMap
 
     private def makeNodeEdgesMap(nodes: Set[Node], edges: Set[Edge]): Map[Node, Set[Edge]] = {
       var nodeEdgesMap: Map[Node, Set[Edge]] = Map.empty
@@ -116,7 +135,7 @@ trait GraphStructure {
         case edge: LessEqualEdge => nodeEdgesMap = nodeEdgesMap.updated(edge.from, nodeEdgesMap.getOrElse(edge.from, Set()) + edge)
         case edge: ConstructorEdge => nodeEdgesMap = nodeEdgesMap.updated(edge.from, nodeEdgesMap.getOrElse(edge.from, Set()) + edge)
       }
-      
+
       nodeEdgesMap
     }
   }

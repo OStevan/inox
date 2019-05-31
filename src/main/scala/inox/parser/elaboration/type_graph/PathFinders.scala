@@ -4,18 +4,21 @@ import inox.parser.elaboration.{Constraints, SimpleTypes}
 
 import scala.collection.mutable
 
-trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
+trait PathFinders {
+  self: GraphStructure with Constraints with SimpleTypes with Elements =>
 
   /**
     * Class representing a path found by path finders
-    * @param edges constructing a path
+    *
+    * @param edges  constructing a path
     * @param finder used to generate the path
     */
-  class GraphPath (val edges: Array[Edge], val finder: PathFinder) {
+  class GraphPath(val edges: Array[Edge], val finder: PathFinder) {
     assert(edges.length != 0, "Path should have some edges connecting the two ")
 
     /**
       * increment the counter of the successful paths
+      *
       * @return
       */
     def incSatisfiableCount(): Unit = {
@@ -41,12 +44,13 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
     /**
       * TODO maybe change this to be more generic?
       * Checks of from is less or equal to to structurally, without any prior knowledge
+      *
       * @param from
       * @param to
       * @return
       */
     private def leq(from: Node, to: Node): Boolean = {
-      if (from entityInformationEquality  to)
+      if (from entityInformationEquality to)
         return true
 
       if (from.isTrivialEnd || to.isTrivialEnd)
@@ -57,12 +61,14 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
     /**
       * Method to get the first element in a path
+      *
       * @return node representing the start of the path
       */
     def firstInPath(): Node = edges(0).from()
 
     /**
       * Method to get the last element of the path
+      *
       * @return nore representing the end node of the path
       */
     def lastInPath(): Node = edges(edges.length - 1).to()
@@ -71,7 +77,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
 
       // TODO finish this
-      if (from entityInformationEquality   to)
+      if (from entityInformationEquality to)
         return true
 
       // TODO add for constructors
@@ -85,6 +91,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
     /**
       * checks if the path is satisfiable having the constraint in mind
+      *
       * @return
       */
     def isSatisfiablePath: Boolean = {
@@ -95,6 +102,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
     /**
       * Checks if a relation is derivable
+      *
       * @return
       */
     def isValidPath: Boolean = {
@@ -110,6 +118,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
     /**
       * if the path is unsatisfiable mark path as contributing
+      *
       * @return
       */
     def markCause() = {
@@ -118,6 +127,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
     /**
       * Checks if the path is satisfiable
+      *
       * @return
       */
     def isUnsatisfiable: Boolean = {
@@ -129,6 +139,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
     /**
       * Checks if the edge is informative based on the explanation from the paper
+      *
       * @return
       */
     def isInformative: Boolean = {
@@ -163,7 +174,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
             !satisfiable(leqElements.top, edge.to()) &&
             // we have reached the same element from were we started
             // edge from is the same as edge to
-            !(leqElements.top == firstInPath()) && (edge.to() ==  lastInPath()))
+            !(leqElements.top == firstInPath()) && (edge.to() == lastInPath()))
             return false
           else if (!edge.to().hasVars) {
             leqElements.pop()
@@ -199,8 +210,9 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
     /**
       * LEQ := LEQ LEQ
       * LEQ := LEFT RIGHT (rule give rise to cyclic paths which are ignored)
-      * @param from node
-      * @param to node
+      *
+      * @param from   node
+      * @param to     node
       * @param length of edge
       */
     protected case class LessEqual(from: Node, to: Node, length: Int) extends ReductionEdge
@@ -208,18 +220,20 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
     /**
       * LEFT := original
       * LEFT := LEFT LEQ (position is inherited from the child LEFT)
-      * @param from node
-      * @param to node
+      *
+      * @param from     node
+      * @param to       node
       * @param position position in constructor
-      * @param length of the edge
+      * @param length   of the edge
       */
     protected case class LeftEdge(from: Node, to: Node, position: Int, length: Int) extends ReductionEdge
 
     /**
       * RIGHT := decompositional
       * RIGHT := LEQ RIGHT (position is inherited from the child right)
-      * @param from node
-      * @param to node
+      *
+      * @param from     node
+      * @param to       node
       * @param position position in the constructor
       * @param size
       */
@@ -322,9 +336,13 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
     var rightEdges: Map[Node, Map[Node, Int]] = Map.empty
 
+    for (node <- graph.nodes
+         if node.isConstructor) {
+      initConstructorsFor(node.element, node)
+    }
+
     init()
     saturation()
-
 
 
     def init(): Unit = {
@@ -366,8 +384,9 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
     /**
       * length of the currently found shortest path
+      *
       * @param start node of the path
-      * @param end node of the path
+      * @param end   node of the path
       * @return length of the path or <code>INFINITY</code> if the path does not exist
       */
     private def getShortestLeq(start: Node, end: Node): Int =
@@ -375,8 +394,9 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
 
     /**
       * sets the new shortest path size between the two nodes
-      * @param start node of the path
-      * @param end node of the path
+      *
+      * @param start  node of the path
+      * @param end    node of the path
       * @param length length of the path connecting the two
       */
     private def setShortestLeq(start: Node, end: Node, length: Int): Unit =
@@ -401,8 +421,8 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
       * apply rule LEQ = LEQ LEQ
       *
       * @param from node of the new edge
-      * @param mid node connecting the two existing edges
-      * @param to node edging the new edge
+      * @param mid  node connecting the two existing edges
+      * @param to   node edging the new edge
       */
     private def ruleLeqLeq(from: Node, mid: Node, to: Node): Unit = {
       if (from entityInformationEquality to)
@@ -415,7 +435,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
         return
       if (leftDistance + rightDistance < currentDistance) {
         setShortestLeq(from, to, leftDistance + rightDistance)
-        inferLeqEdge(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)),atomic = false)
+        inferLeqEdge(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)), atomic = false)
       }
 
     }
@@ -431,7 +451,7 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
         return
       if (leftDistance + rightDistance < currentDistance) {
         setShortestLeft(from, to, position, leftDistance + rightDistance)
-        inferLeftEdge(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)), atomic = false, position=position)
+        inferLeftEdge(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)), atomic = false, position = position)
       }
     }
 
@@ -459,30 +479,58 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
     }
 
     def compatibleConstructors(constructorFrom: Node, constructorTo: Node): Boolean =
-      constructorFrom.compatibleConstuctors(constructorTo)
+      constructorFrom.compatibleConstructors(constructorTo)
 
+
+    def initConstructorsFor(element: Element, node: Node): Unit = element match {
+      case _: TypeClassElement => ()
+      case TypeElement(tpe) => tpe match {
+        case SimpleTypes.BagType(elem) =>
+          initConstructorsFor(TypeElement(elem), node)
+        case SimpleTypes.SetType(elem) =>
+          initConstructorsFor(TypeElement(elem), node)
+        case SimpleTypes.MapType(from, to) =>
+          List(from, to).foreach(elem => {
+            initConstructorsFor(TypeElement(elem), node)
+          })
+        case SimpleTypes.ADTType(identifier, args) =>
+          args.foreach(elem => {
+            initConstructorsFor(TypeElement(elem), node)
+          })
+        case SimpleTypes.FunctionType(froms, to) =>
+          froms.foreach(elem => {
+            initConstructorsFor(TypeElement(elem), node)
+          })
+          initConstructorsFor(TypeElement(to), node)
+        case SimpleTypes.TupleType(elems) =>
+          elems.foreach(elem => {
+            initConstructorsFor(TypeElement(elem), node)
+          })
+        case simple =>
+          val (g, addedNode) = graph.addBlackNode(TypeElement(simple))
+          graph = g
+          constructorNodes = constructorNodes.updated(addedNode, constructorNodes.getOrElse(addedNode, List()) :+ node)
+      }
+    }
 
     // TODO change this to use elements
     def expandNode(original: Node, subst: Node, equal: LessEqual) = {
-//      if (constructorNodes.contains(original) && original.color == Black && subst.color == Black) {
-//        constructorNodes(original).foreach(constructorNode => if (constructorNode.color == Black || !trace(constructorNode).contains(equal)) {
-//          assert(constructorNode.isInstanceOf[Nodes.TypeNode])
-//          assert(original.isInstanceOf[Nodes.TypeNode])
-//          assert(subst.isInstanceOf[Nodes.TypeNode])
-//          val replaced: List[Node] = replace(constructorNode.asInstanceOf[Nodes.TypeNode].tpe,
-//            original.asInstanceOf[Nodes.TypeNode], subst.asInstanceOf[Nodes.TypeNode].tpe)
-//          replaced.foreach(newNode => if (!graph.containsColorAgnostic(newNode)) {
-//            graph = graph union Graph.apply(newNode)
-//            if (constructorNode.color == White)
-//              trace = trace.updated(newNode, trace(constructorNode) + equal)
-//            else
-//              trace = trace.updated(newNode, Set.empty + equal)
-//
-//            // change this to use elements
-//            initTablesFor()
-//          })
-//        })
-//      }
+      if (constructorNodes.contains(original) && original.color == Black && subst.color == Black) {
+        constructorNodes(original).foreach(constructorNode => if (constructorNode.color == Black || !trace(constructorNode).contains(equal)) {
+          val replaced = constructorNode.element.replace(original.element, subst.element)
+          replaced.foreach(newElement => if (!graph.elementNodeMap.contains(newElement)) {
+            val (g, newNode) = graph.addWhiteNode(newElement)
+            graph = g
+            if (constructorNode.color == White)
+              trace = trace.updated(newNode, trace(constructorNode) + equal)
+            else
+              trace = trace.updated(newNode, Set.empty + equal)
+
+            // change this to use elements
+            initConstructorsFor(newElement, newNode)
+          })
+        })
+      }
     }
 
     def addMoreEdges(edge: LessEqual): Unit = {
@@ -497,26 +545,28 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
         if (constructorNodes.contains(from) && constructorNodes.contains(to)) {
           for (constructorFrom <- constructorNodes(from)) {
             for (constructorTo <- constructorNodes(to)
-            if compatibleConstructors(constructorFrom, constructorTo)
+                 if compatibleConstructors(constructorFrom, constructorTo)
                  if !hasLeqEdge(from, to) || !hasLeqEdge(to, from)) {
               // by tests we know that the node has to be type node
-              val fromChildren = graph.nodeEdgesMap(from).foldLeft(Seq[Edges.ConstructorEdge]()){
-                (collector, edge) => edge match {
-                  case e: Edges.ConstructorEdge if e.direction == Edges.ConstructorEdgeDirection.Decompositional => collector :+ e
-                  case _ => collector
-                }
+              val fromChildren = graph.nodeEdgesMap(from).foldLeft(Seq[Edges.ConstructorEdge]()) {
+                (collector, edge) =>
+                  edge match {
+                    case e: Edges.ConstructorEdge if e.direction == Edges.ConstructorEdgeDirection.Decompositional => collector :+ e
+                    case _ => collector
+                  }
               }.sortBy(edge => edge.position).map(_.to)
-              val toChildren = graph.nodeEdgesMap(to).foldLeft(Seq[Edges.ConstructorEdge]()){
-                (collector, edge) => edge match {
-                  case e: Edges.ConstructorEdge if e.direction == Edges.ConstructorEdgeDirection.Decompositional => collector :+ e
-                  case _ => collector
-                }
+              val toChildren = graph.nodeEdgesMap(to).foldLeft(Seq[Edges.ConstructorEdge]()) {
+                (collector, edge) =>
+                  edge match {
+                    case e: Edges.ConstructorEdge if e.direction == Edges.ConstructorEdgeDirection.Decompositional => collector :+ e
+                    case _ => collector
+                  }
               }.sortBy(edge => edge.position).map(_.to)
 
               if (fromChildren.zip(toChildren).forall(pair => hasLeqEdge(pair._1, pair._2))) {
                 var size = 0
                 var evidence: Seq[Evidence] = Seq.empty
-                fromChildren.zip(toChildren).foreach{
+                fromChildren.zip(toChildren).foreach {
                   pair =>
                     if (getShortestLeq(pair._1, pair._2) < INFINITY) {
                       size += getShortestLeq(pair._1, pair._2)
@@ -541,11 +591,10 @@ trait PathFinders { self: GraphStructure with Constraints with SimpleTypes=>
         val edge = queue.dequeue()
 
         // tryAddingExtraEdges, without constructors
-
-//        edge match {
-//          case a: LessEqual => addMoreEdges(a)
-//          case _ => ()
-//        }
+        edge match {
+          case a: LessEqual => addMoreEdges(a)
+          case _ => ()
+        }
 
         for (node <- allNodes) {
           edge match {
