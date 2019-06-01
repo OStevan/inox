@@ -12,6 +12,8 @@ trait Elements {
     * Encapsulates type classes and types for easier graph manipulation, uses also underlying position of types and classes
     */
   trait Element {
+    def typeInformation: String
+
 
     implicit class Crossable[X](xs: Traversable[X]) {
       def cross[Y](ys: Traversable[Y]): Traversable[(X, Y)] = for {x <- xs; y <- ys } yield (x, y)
@@ -170,6 +172,8 @@ trait Elements {
         // ignore replacements with type classes
         List()
     }
+
+    override def typeInformation: String = "Type " + tpe.toString
   }
 
   /**
@@ -199,6 +203,8 @@ trait Elements {
       // ignore replacing on type classes
       List()
     }
+
+    override def typeInformation: String = "Type class " + typeClass.toString
   }
 
 }

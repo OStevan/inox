@@ -5,7 +5,7 @@ import inox.parser.elaboration.SimpleTypes
 import scala.util.parsing.input.Position
 
 trait ErrorInferencers {
-  self: PathFinders with ErrorReasons with ErrorReasonSearch with GraphStructure with SimpleTypes=>
+  self: PathFinders with ErrorReasons with ErrorReasonSearch with GraphStructure with SimpleTypes with Elements =>
 
   abstract class ErrorInference(val paths: Seq[GraphPath]) {
 
@@ -36,10 +36,10 @@ trait ErrorInferencers {
 
   class TypeReasonInference(paths: Seq[GraphPath], val nodes: Set[Node]) extends ErrorInference(paths) {
 
-    private var satisfiableCounts: Map[Position, Int] = Map.empty
+    private var satisfiableCounts: Map[Element, Int] = Map.empty
 
     for (node <- nodes) {
-      satisfiableCounts = satisfiableCounts + (node.pos -> node.satisfiableCount())
+      satisfiableCounts = satisfiableCounts + (node.element -> node.satisfiableCount())
     }
 
     /**
@@ -50,7 +50,7 @@ trait ErrorInferencers {
 
       for (path <- paths) {
         path.pathNodes().filter(node => !node.isTrivialEnd).foreach(node =>
-          candidates = candidates + TypeEntity(node.pos, satisfiableCounts(node.pos))
+          candidates = candidates + TypeEntity(node.element, satisfiableCounts(node.element))
         )
       }
 

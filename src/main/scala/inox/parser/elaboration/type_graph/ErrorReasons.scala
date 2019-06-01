@@ -6,7 +6,7 @@ import inox.parser.elaboration.SimpleTypes
 import scala.util.parsing.input.Position
 
 trait ErrorReasons {
-  self: PathFinders with SimpleTypes with ElaborationErrors=>
+  self: PathFinders with SimpleTypes with ElaborationErrors with Elements =>
 
   /**
     * Result of type graph error diagnosis, this should be mapped to an exception which can be used by rest of
@@ -18,7 +18,7 @@ trait ErrorReasons {
   case class Reason(entities: Set[Entity], weight: Double) extends Comparable[Reason] {
     override def compareTo(other: Reason): Int = weight.compareTo(other.weight)
 
-    def toErrorMessage(): String = withPositions("graph: Invalid assigned types")(entities.map(_.pos).toSeq)
+    def toErrorMessage: String = ("graph: Invalid assigned types" :: entities.map(_.toErrorMessage).toList).mkString("\n")
   }
 
 
@@ -35,13 +35,15 @@ trait ErrorReasons {
       */
     def explainsPath(path: GraphPath): Boolean
 
+    def toErrorMessage: String
+
     override def equals(obj: Any): Boolean
   }
 
   /**
     * Gives reasons why assigned types are incorrect, entity is represented as a type assigned at a certain position
     */
-  case class TypeEntity(position: Position, satisfiableCount: Int) extends Entity(position, satisfiableCount) {
+  case class TypeEntity(element: Element, satisfiableCount: Int) extends Entity(element.position, satisfiableCount) {
 
     /**
       * Checks if this entity gives a valid reason why the expression is not satisfiable
@@ -50,7 +52,9 @@ trait ErrorReasons {
       * @return flag if it in fact explains the reason why the path is unsatisfiable
       */
     override def explainsPath(path: GraphPath): Boolean = {
-      path.pathNodes().exists(node => node.pos == position)
+      path.pathNodes().exists(node => node.element == element)
     }
+
+    override def toErrorMessage: String = withPosition(element.typeInformation + " of expression is wrong")(element.position)
   }
 }
