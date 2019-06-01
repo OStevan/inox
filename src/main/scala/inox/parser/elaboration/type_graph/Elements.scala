@@ -69,11 +69,38 @@ trait Elements {
       }
     }
 
+    protected def accept(first: SimpleTypes.Type, second: SimpleTypes.Type): Boolean = (first, second) match {
+      case (u1: SimpleTypes.Unknown, _) => true
+      case (_, u2: SimpleTypes.Unknown) => true
+      case (SimpleTypes.UnitType(), SimpleTypes.UnitType()) => true
+      case (SimpleTypes.IntegerType(), SimpleTypes.IntegerType()) => true
+      case (SimpleTypes.BitVectorType(signed1, size1), SimpleTypes.BitVectorType(signed2, size2)) if signed1 == signed2 && size1 == size2 => true
+      case (SimpleTypes.BooleanType(), SimpleTypes.BooleanType()) => true
+      case (SimpleTypes.StringType(), SimpleTypes.StringType()) => true
+      case (SimpleTypes.CharType(), SimpleTypes.CharType()) => true
+      case (SimpleTypes.RealType(), SimpleTypes.RealType()) => true
+      case (SimpleTypes.FunctionType(fs1, t1), SimpleTypes.FunctionType(fs2, t2)) if fs1.size == fs2.size => {
+        fs1.zip(fs2).forall(pair => accept(pair._1, pair._2)) && accept(t1, t2)
+      }
+      case (SimpleTypes.TupleType(es1), SimpleTypes.TupleType(es2)) if es1.size == es2.size =>
+        es1.zip(es2).forall(pair => accept(pair._1, pair._2))
+      case (SimpleTypes.MapType(f1, t1), SimpleTypes.MapType(f2, t2)) => {
+        accept(f1, f2) && accept(t1, t2)
+      }
+      case (SimpleTypes.SetType(e1), SimpleTypes.SetType(e2)) => accept(e1, e2)
+      case (SimpleTypes.BagType(e1), SimpleTypes.BagType(e2)) => accept(e1, e2)
+      case (SimpleTypes.ADTType(i1, as1), SimpleTypes.ADTType(i2, as2)) if i1 == i2 && as1.size == as2.size =>
+        as1.zip(as2).forall(pair => accept(pair._1, pair._2))
+      case (SimpleTypes.TypeParameter(i1), SimpleTypes.TypeParameter(i2)) if i1 == i2 => true
+      case _ => false
+    }
+
     def accept(other: Element): Boolean = (this, other) match {
       case (first: TypeClassElement, second: TypeElement) => first.typeClass.accepts(second.tpe).isInstanceOf[Some[Seq[Constraint]]]
       case (first: TypeClassElement, second: TypeClassElement) =>
         //TODO check with Romain
         false
+      case (first: TypeElement, second: TypeElement) => accept(first.tpe, second.tpe)
       case _ => false
     }
 
@@ -135,10 +162,12 @@ trait Elements {
       case (first: TypeElement, second: TypeElement) => tpe match {
         case _: SimpleTypes.TupleType | _: SimpleTypes.ADTType | _: SimpleTypes.FunctionType | _: SimpleTypes.BagType
              | _: SimpleTypes.SetType | _: SimpleTypes.MapType => replace(tpe, first.tpe, second.tpe).map(tpe => TypeElement(tpe))
-        case _ => assert(false, "Should not try to replace on simple types")
+        case _ =>
+          // ignore replacements for simple types
           List()
       }
-      case _ => assert(false, "Substitutions with type classes should never happen")
+      case _ =>
+        // ignore replacements with type classes
         List()
     }
   }
@@ -167,7 +196,7 @@ trait Elements {
     override def isConstructor: Boolean = false
 
     override def replace(original: Element, substitution: Element): List[Element] = {
-      assert(false, "Replacing on type classes should never happen")
+      // ignore replacing on type classes
       List()
     }
   }

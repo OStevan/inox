@@ -35,7 +35,7 @@ trait TypeGraphAnalysis extends GraphStructure
             path.incSatisfiableCount()
           } else if (path.isSatisfiablePath) {
             path.incSatisfiableCount()
-            // here expansion is should be done
+            // here is where expansion is should be done
           }
           List()
         }
@@ -48,12 +48,15 @@ trait TypeGraphAnalysis extends GraphStructure
 
       val finder = getPathFinder(graph)
 
+      var testedPaths: List[(Node, Node)] = List.empty
+
 
       for (start <- graph.nodes) {
         for (end <- graph.nodes) {
           if (finder.hasLeqEdge(start, end)) {
             // skolem check is not needed
             val hops: List[Edge] = finder.getPath(start, end)
+            testedPaths = (start, end) :: testedPaths
             unsatisfiable = unsatisfiable ++ testConsistency(start, end, hops, finder)
           }
         }

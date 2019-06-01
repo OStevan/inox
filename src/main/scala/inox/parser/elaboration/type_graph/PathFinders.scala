@@ -143,16 +143,18 @@ trait PathFinders {
       * @return
       */
     def isInformative: Boolean = {
-      //    When either end node of a satisfiable LEQ edge is an unification variable, its satisfi-
-      //    ability is trivial and hence not informative for error diagnosis. Also uninformative is an LEQ edge derived
-      //    from unsatisfiable edges. Only the informative edges are used for error diagnosis.
 
       if (edges.length == 0)
         return false
 
+      // trivially satisfiable not informative
+      if (firstInPath().isTrivialEnd || lastInPath().isTrivialEnd)
+
+      // path is trivially satisfiable
       if (firstInPath() entityInformationEquality lastInPath())
         return false
 
+      // compatible types
       if (lastInPath() accept firstInPath())
         return false
 
@@ -160,13 +162,28 @@ trait PathFinders {
       // add a check if an node is added during graph saturation if it is then a path is not informative
 
       val leqElements: mutable.Stack[Node] = mutable.Stack()
+      val constructorConditions: mutable.Stack[(Int, Edges.ConstructorEdgeDirection.Direction)] = mutable.Stack()
       val length = 0
       val firstNode = firstInPath()
       leqElements.push(firstNode)
 
       for (edge <- edges) {
-        if (!edge.to().isTrivialEnd) {
+        var shouldCompare = !edge.to().isTrivialEnd
 
+        edge match {
+          case Edges.ConstructorEdge(_, _, dir, pos) =>
+            if (constructorConditions.isEmpty || !(constructorConditions.top._1 == pos && constructorConditions.top._2 != dir)) {
+              constructorConditions.push((pos, dir))
+              leqElements.push(edge.to())
+              shouldCompare = false
+            } else {
+              constructorConditions.pop()
+              leqElements.pop()
+            }
+          case _ => ()
+        }
+
+        if (shouldCompare) {
           // there are still non processed nodes
           if (leqElements.nonEmpty &&
             // path until here is not satisfiable
@@ -174,7 +191,7 @@ trait PathFinders {
             !satisfiable(leqElements.top, edge.to()) &&
             // we have reached the same element from were we started
             // edge from is the same as edge to
-            !(leqElements.top == firstInPath()) && (edge.to() == lastInPath()))
+            !(leqElements.top entityInformationEquality  firstInPath()) && (edge.to() entityInformationEquality lastInPath()))
             return false
           else if (!edge.to().hasVars) {
             leqElements.pop()
@@ -352,23 +369,26 @@ trait PathFinders {
         case Edges.ConstructorEdge(from, to, Edges.ConstructorEdgeDirection.Original, position) =>
           inferLeftEdge(from, to, 1, List.empty, position, atomic = true)
         case Edges.ConstructorEdge(from, to, Edges.ConstructorEdgeDirection.Decompositional, position) =>
-          insertRightEdge(to, from, position)
+          insertRightEdge(from, to, position)
       }
     }
 
 
     // edge inference
     override def inferLeqEdge(from: Node, to: Node, length: Int, evidence: List[Evidence], atomic: Boolean): Unit = {
-      addNextHop(from, to, evidence)
       if (from entityInformationEquality to)
         return
+      addNextHop(from, to, evidence)
       queue.enqueue(LessEqual(from, to, length))
       setShortestLeq(from, to, length)
       if (atomic)
         addAtomicLeqEdge(from, to)
     }
 
-    def inferLeftEdge(from: Node, to: Node, length: Int, list: List[Evidence], position: Int, atomic: Boolean): Unit = {
+    def inferLeftEdge(from: Node, to: Node, length: Int, evidence: List[Evidence], position: Int, atomic: Boolean): Unit = {
+      if (from entityInformationEquality to)
+        return
+      addNextHop(from, to, evidence)
       queue.enqueue(LeftEdge(from, to, position, length))
       setShortestLeft(from, to, position, length)
     }
