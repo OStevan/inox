@@ -49,7 +49,7 @@ trait ErrorInferencers {
       var candidates: Set[Entity] = Set.empty
 
       for (path <- paths) {
-        path.pathNodes().filter(node => !node.isTrivialEnd).foreach(node =>
+        path.pathNodes().filter(node => !node.hasVars).foreach(node =>
           candidates = candidates + TypeEntity(node.element, satisfiableCounts(node.element))
         )
       }

@@ -2,7 +2,7 @@ package inox.parser.elaboration.type_graph
 
 import inox.parser.elaboration.{Constraints, SimpleTypes}
 
-import scala.util.parsing.input.Position
+import scala.util.parsing.input.{NoPosition, Position}
 
 trait GraphStructure {
   self: Elements with SimpleTypes with Constraints =>
@@ -170,93 +170,98 @@ trait GraphStructure {
       (Set.empty, Set.empty)
   }
 
-  def construct(tpe: SimpleTypes.Type): (Node, (Set[Node], Set[Edge])) = tpe match {
-    case SimpleTypes.FunctionType(froms, to) =>
-      val (toNode, toGraph) = construct(to)
-      val funNode = Node(new TypeElement(tpe))
+  def construct(tpe: SimpleTypes.Type): (Node, (Set[Node], Set[Edge])) = {
+//    if ()
+//    if (tpe.pos == NoPosition)
+//      assert(tpe.pos == NoPosition, "Every type should have a position for graph analysis")
+    tpe match {
+      case SimpleTypes.FunctionType(froms, to) =>
+        val (toNode, toGraph) = construct(to)
+        val funNode = Node(new TypeElement(tpe))
 
-      val startGraph = (
-        toGraph._1 + funNode, // node union
-        toGraph._2 union Set( // edge union
-          ConstructorEdge(toNode, funNode, ConstructorEdgeDirection.Original, froms.length),
-          ConstructorEdge(funNode, toNode, ConstructorEdgeDirection.Decompositional, froms.length)
+        val startGraph = (
+          toGraph._1 + funNode, // node union
+          toGraph._2 union Set( // edge union
+            ConstructorEdge(toNode, funNode, ConstructorEdgeDirection.Original, froms.length),
+            ConstructorEdge(funNode, toNode, ConstructorEdgeDirection.Decompositional, froms.length)
+          ))
+
+        (funNode,
+          froms.foldLeft((0, startGraph))((pair, elem) => {
+            val (elemNode, elemGraph) = construct(elem)
+            (pair._1 + 1, (
+              pair._2._1 union elemGraph._1, // node union
+              pair._2._2 union elemGraph._2 union // edge union
+                Set(ConstructorEdge(elemNode, funNode, ConstructorEdgeDirection.Original, pair._1),
+                  ConstructorEdge(funNode, elemNode, ConstructorEdgeDirection.Decompositional, pair._1)))
+            )
+
+          })._2
+        )
+      case SimpleTypes.TupleType(elems) =>
+        val tupleType = Node(new TypeElement(tpe))
+
+        (tupleType,
+          elems.foldLeft((0, (Set(tupleType), Set.empty[Edge])))((pair, elem) => {
+            val (elemNode, elemGraph) = construct(elem)
+            (pair._1 + 1, (
+              pair._2._1 union elemGraph._1,
+              pair._2._2 union elemGraph._2 union Set(
+                ConstructorEdge(elemNode, tupleType, ConstructorEdgeDirection.Original, pair._1),
+                ConstructorEdge(tupleType, elemNode, ConstructorEdgeDirection.Decompositional, pair._1)))
+            )
+          })._2
+        )
+      case SimpleTypes.BagType(elemType) =>
+        val bagNode = Node(new TypeElement(tpe))
+        val (elemNode, elemGraph) = construct(elemType)
+        (bagNode, (
+          elemGraph._1 + bagNode,
+          elemGraph._2 union Set(
+            ConstructorEdge(elemNode, bagNode, ConstructorEdgeDirection.Original, 0),
+            ConstructorEdge(bagNode, elemNode, ConstructorEdgeDirection.Decompositional, 0)
+          )
         ))
-
-      (funNode,
-        froms.foldLeft((0, startGraph))((pair, elem) => {
-          val (elemNode, elemGraph) = construct(elem)
-          (pair._1 + 1, (
-            pair._2._1 union elemGraph._1, // node union
-            pair._2._2 union elemGraph._2 union // edge union
-              Set(ConstructorEdge(elemNode, funNode, ConstructorEdgeDirection.Original, pair._1),
-                ConstructorEdge(funNode, elemNode, ConstructorEdgeDirection.Decompositional, pair._1)))
+      case SimpleTypes.SetType(elemType) =>
+        val setNode = Node(new TypeElement(tpe))
+        val (elemNode, elemGraph) = construct(elemType)
+        (setNode, (
+          elemGraph._1 + setNode,
+          elemGraph._2 union Set(
+            ConstructorEdge(elemNode, setNode, ConstructorEdgeDirection.Original, 0),
+            ConstructorEdge(setNode, elemNode, ConstructorEdgeDirection.Decompositional, 0)
           )
-
-        })._2
-      )
-    case SimpleTypes.TupleType(elems) =>
-      val tupleType = Node(new TypeElement(tpe))
-
-      (tupleType,
-        elems.foldLeft((0, (Set(tupleType), Set.empty[Edge])))((pair, elem) => {
-          val (elemNode, elemGraph) = construct(elem)
-          (pair._1 + 1, (
-            pair._2._1 union elemGraph._1,
-            pair._2._2 union elemGraph._2 union Set(
-              ConstructorEdge(elemNode, tupleType, ConstructorEdgeDirection.Original, pair._1),
-              ConstructorEdge(tupleType, elemNode, ConstructorEdgeDirection.Decompositional, pair._1)))
+        ))
+      case SimpleTypes.ADTType(_, args) =>
+        val adtNode = Node(new TypeElement(tpe))
+        (adtNode,
+          args.foldLeft((0, (Set(adtNode), Set.empty[Edge])))((pair, elem) => {
+            val (elemNode, elemGraph) = construct(elem)
+            (pair._1 + 1, (
+              pair._2._1 union elemGraph._1,
+              pair._2._2 union elemGraph._2 union Set(
+                ConstructorEdge(elemNode, adtNode, ConstructorEdgeDirection.Original, pair._1),
+                ConstructorEdge(adtNode, elemNode, ConstructorEdgeDirection.Decompositional, pair._1)))
+            )
+          })._2
+        )
+      case SimpleTypes.MapType(from, to) =>
+        val (fromNode, fromGraph) = construct(from)
+        val (toNode, toGraph) = construct(to)
+        val mapNode = Node(new TypeElement(tpe))
+        (mapNode,
+          (fromGraph._1 union toGraph._1 + mapNode,
+            fromGraph._2 union toGraph._2 union Set(
+              ConstructorEdge(fromNode, mapNode, ConstructorEdgeDirection.Original, 0),
+              ConstructorEdge(mapNode, fromNode, ConstructorEdgeDirection.Decompositional, 0),
+              ConstructorEdge(toNode, mapNode, ConstructorEdgeDirection.Original, 1),
+              ConstructorEdge(mapNode, toNode, ConstructorEdgeDirection.Decompositional, 1))
           )
-        })._2
-      )
-    case SimpleTypes.BagType(elemType) =>
-      val bagNode = Node(new TypeElement(tpe))
-      val (elemNode, elemGraph) = construct(elemType)
-      (bagNode, (
-        elemGraph._1 + bagNode,
-        elemGraph._2 union Set(
-          ConstructorEdge(elemNode, bagNode, ConstructorEdgeDirection.Original, 0),
-          ConstructorEdge(bagNode, elemNode, ConstructorEdgeDirection.Decompositional, 0)
         )
-      ))
-    case SimpleTypes.SetType(elemType) =>
-      val setNode = Node(new TypeElement(tpe))
-      val (elemNode, elemGraph) = construct(elemType)
-      (setNode, (
-        elemGraph._1 + setNode,
-        elemGraph._2 union Set(
-          ConstructorEdge(elemNode, setNode, ConstructorEdgeDirection.Original, 0),
-          ConstructorEdge(setNode, elemNode, ConstructorEdgeDirection.Decompositional, 0)
-        )
-      ))
-    case SimpleTypes.ADTType(_, args) =>
-      val adtNode = Node(new TypeElement(tpe))
-      (adtNode,
-        args.foldLeft((0, (Set(adtNode), Set.empty[Edge])))((pair, elem) => {
-          val (elemNode, elemGraph) = construct(elem)
-          (pair._1 + 1, (
-            pair._2._1 union elemGraph._1,
-            pair._2._2 union elemGraph._2 union Set(
-              ConstructorEdge(elemNode, adtNode, ConstructorEdgeDirection.Original, pair._1),
-              ConstructorEdge(adtNode, elemNode, ConstructorEdgeDirection.Decompositional, pair._1)))
-          )
-        })._2
-      )
-    case SimpleTypes.MapType(from, to) =>
-      val (fromNode, fromGraph) = construct(from)
-      val (toNode, toGraph) = construct(to)
-      val mapNode = Node(new TypeElement(tpe))
-      (mapNode,
-        (fromGraph._1 union toGraph._1 + mapNode,
-          fromGraph._2 union toGraph._2 union Set(
-            ConstructorEdge(fromNode, mapNode, ConstructorEdgeDirection.Original, 0),
-            ConstructorEdge(mapNode, fromNode, ConstructorEdgeDirection.Decompositional, 0),
-            ConstructorEdge(toNode, mapNode, ConstructorEdgeDirection.Original, 1),
-            ConstructorEdge(mapNode, toNode, ConstructorEdgeDirection.Decompositional, 1))
-        )
-      )
-    case a: SimpleTypes.Type =>
-      val node = Node(new TypeElement(tpe))
-      (node, (Set(node), Set.empty[Edge]))
+      case a: SimpleTypes.Type =>
+        val node = Node(new TypeElement(tpe))
+        (node, (Set(node), Set.empty[Edge]))
+    }
   }
 
   //  def saturate(graph: Graph): Graph = graph match {

@@ -10,16 +10,16 @@ class ConstructorTests extends FunSuite {
 
   implicit val symbols = NoSymbols
 
-    test("lambda type detected as wrong") {
-      try {
-        fd"def rep(n: Int): Int => Int = if (n == 0) lambda (x: Char) => x else lambda (x: Int) => x"
-        fail("No errors detected, while there should be one")
-      } catch {
-        case InterpolatorException(text) =>
-          assert(text.contains("graph"))
-          println(text)
-      }
+  test("lambda type detected as wrong") {
+    try {
+      fd"def rep(n: Int): Int => Int = if (n == 0) lambda (x: Char) => x else lambda (x: Int) => x"
+      fail("No errors detected, while there should be one")
+    } catch {
+      case InterpolatorException(text) =>
+        assert(text.contains("graph"))
+        println(text)
     }
+  }
 
   test("Type of parameter and return type is wrong") {
     try {
@@ -46,11 +46,33 @@ class ConstructorTests extends FunSuite {
       p"""
           def testFunction(a: Int, b: String, c: Char) = a
 
-          def main(): Char = {
+          def main(): Int = {
             let a = 1;
             let b = `b`;
             let c = `c`;
             testFunction(a, b, c)
+          }
+       """
+      fail("There should be an error")
+    } catch {
+      case InterpolatorException(text) =>
+        assert(text.contains("graph"))
+        println(text)
+    }
+  }
+
+  test("Type of a argument is wrong") {
+    try {
+      p"""
+          def testFunction(a: Int, b: String, c: Char) = a
+
+          def main(): Int = {
+            let a = 1;
+            let b = `b`;
+            let c = `c`;
+            let d = 'blabla';
+            let e = testFunction(a, b, c);
+            testFunction(a, d, c)
           }
        """
       fail("There should be an error")

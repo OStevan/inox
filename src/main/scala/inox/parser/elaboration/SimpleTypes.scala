@@ -51,7 +51,7 @@ trait SimpleTypes { self: Trees =>
         case _ => Set()
       }
 
-      def replaceTypeParams(mapping: Map[inox.Identifier, Type]): Type = this match {
+      def replaceTypeParams(mapping: Map[inox.Identifier, Type]): Type = (this match {
         case TypeParameter(id) => mapping.getOrElse(id, this)
         case FunctionType(froms, to) => FunctionType(froms.map(_.replaceTypeParams(mapping)), to.replaceTypeParams(mapping))
         case MapType(from, to) => MapType(from.replaceTypeParams(mapping), to.replaceTypeParams(mapping))
@@ -60,7 +60,7 @@ trait SimpleTypes { self: Trees =>
         case TupleType(elems) => TupleType(elems.map(_.replaceTypeParams(mapping)))
         case ADTType(id, elems) => ADTType(id, elems.map(_.replaceTypeParams(mapping)))
         case _ => this
-      }
+      }).withPos(this.pos)
     }
     case class UnitType() extends Type
     case class BooleanType() extends Type

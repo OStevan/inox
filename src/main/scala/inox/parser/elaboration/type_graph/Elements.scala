@@ -3,7 +3,7 @@ package inox.parser.elaboration.type_graph
 import inox.parser.elaboration.{Constraints, SimpleTypes}
 
 import scala.collection.immutable.Queue
-import scala.util.parsing.input.Position
+import scala.util.parsing.input.{NoPosition, Position}
 
 trait Elements {
   self: SimpleTypes with Constraints =>
@@ -43,7 +43,7 @@ trait Elements {
       case SimpleTypes.FunctionType(froms, to) =>
         (replace(froms, original, substitution) cross replace(to, original, substitution)).map(pair => SimpleTypes.FunctionType(pair._1, pair._2).withPos(tpe.pos))
       case SimpleTypes.TupleType(elems) =>
-        replace(elems, original, substitution).map(res => SimpleTypes.TupleType(res))
+        replace(elems, original, substitution).map(res => SimpleTypes.TupleType(res).withPos(tpe.pos))
       case SimpleTypes.ADTType(ident, args) =>
         replace(args, original, substitution).map(res => SimpleTypes.ADTType(ident, res).withPos(tpe.pos))
       case _ if tpe == original => Queue(original, substitution)
@@ -51,8 +51,12 @@ trait Elements {
     }
 
     def position: Position = this match {
-      case element: TypeElement => element.tpe.pos
-      case element: TypeClassElement => element.pos
+      case element: TypeElement =>
+//        assert(element.tpe.pos != NoPosition, "Some type dos not have a position")
+        element.tpe.pos
+      case element: TypeClassElement =>
+//        assert(element.pos != NoPosition, "Some type class dos not have a position")
+        element.pos
     }
 
     def compatibleConstructors(entity: Element): Boolean = (this, entity) match {
@@ -146,7 +150,7 @@ trait Elements {
       case _ => false
     }
 
-    override def hasVars: Boolean = tpe.unknowns.isEmpty
+    override def hasVars: Boolean = tpe.unknowns.nonEmpty
 
     override def isTrivialEnd: Boolean = tpe match {
       case _: SimpleTypes.Unknown => true
