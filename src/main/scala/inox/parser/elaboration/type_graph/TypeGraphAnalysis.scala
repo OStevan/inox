@@ -12,24 +12,21 @@ trait TypeGraphAnalysis extends GraphStructure
   self: SimpleTypes with Constraints with ElaborationErrors =>
 
 
-  class ConstraintGraphAnalysis {
+  class ConstraintGraphAnalysis(val graph: Graph) {
 
+    private val pathFinder = new ShortestPathFinder(graph)
 
-    private def getPathFinder(graph: Graph): PathFinder = {
-      new ShortestPathFinder(graph)
-    }
-
-    def testConsistency(start: Node, end: Node, hops: List[Edge], finder: PathFinder): List[GraphPath] = {
+    def testConsistency(start: Node, end: Node, hops: List[Edge], finder: PathFinder): Option[GraphPath] = {
 
       if (start.isTrivialEnd || end.isTrivialEnd)
-        return List()
+        return None
 
       val path = new GraphPath(hops.toArray, finder)
 
       if (path.isInformative) {
         if (path.isUnsatisfiable) {
           path.markCause()
-          List(path)
+          Some(path)
         } else {
           if (path.isValidPath) {
             path.incSatisfiableCount()
@@ -37,46 +34,69 @@ trait TypeGraphAnalysis extends GraphStructure
             path.incSatisfiableCount()
             // here is where expansion is should be done
           }
-          List()
+          None
         }
       } else
-        List()
+        None
     }
 
-    def generateErrorPaths(graph: Graph): List[GraphPath] = {
+    def generateErrorPaths(): List[GraphPath] = {
       var unsatisfiable: List[GraphPath] = List()
-
-      val finder = getPathFinder(graph)
-
-      var testedPaths: List[(Node, Node)] = List.empty
 
 
       for (start <- graph.nodes) {
         for (end <- graph.nodes) {
-          if (finder.hasLeqEdge(start, end)) {
+          if (pathFinder.hasLeqEdge(start, end)) {
             // skolem check is not needed
-            val hops: List[Edge] = finder.getPath(start, end)
-            testedPaths = (start, end) :: testedPaths
-            unsatisfiable = unsatisfiable ++ testConsistency(start, end, hops, finder)
+            val hops: List[Edge] = pathFinder.getPath(start, end)
+            testConsistency(start, end, hops, pathFinder).foreach(path => unsatisfiable = path :: unsatisfiable
+            )
           }
         }
       }
 
       unsatisfiable
     }
+
+    def generateUnsatisfiablePairs(element: Element): Set[Element] = {
+      var pairs: Set[Element] = Set.empty
+
+      assert(graph.elementNodeMap.keySet contains element)
+
+      val node = graph.elementNodeMap(element)
+
+
+      for (other <- graph.nodes) {
+        if (pathFinder.hasLeqEdge(node, other)) {
+          // skolem check is not needed
+          val hops: List[Edge] = pathFinder.getPath(node, other)
+          testConsistency(node, other, hops, pathFinder).foreach(elem => pairs = pairs + other.element)
+        }
+        if (pathFinder.hasLeqEdge(other, node)) {
+          val hops: List[Edge] = pathFinder.getPath(other, node)
+          testConsistency(other, node, hops, pathFinder).foreach(elem => pairs = pairs + other.element)
+        }
+      }
+
+      pairs
+    }
   }
 
 
   class GraphDiagnosis(val graph: Graph) {
 
-    private val constraintGraphAnalysis: ConstraintGraphAnalysis = new ConstraintGraphAnalysis
+    private val constraintGraphAnalysis: ConstraintGraphAnalysis = new ConstraintGraphAnalysis(graph)
 
     def numberOfUnsatisfiablePaths(): Int = {
-      constraintGraphAnalysis.generateErrorPaths(graph).size
+      constraintGraphAnalysis.generateErrorPaths().size
     }
 
     def getUnsatisfiablePaths(): Seq[GraphPath] = {
-      constraintGraphAnalysis.generateErrorPaths(graph)
+      constraintGraphAnalysis.generateErrorPaths()
+    }
+
+    def getUnsatisfiablePairs(element: Element): Set[Element] = {
+      constraintGraphAnalysis.generateUnsatisfiablePairs(element)
     }
 
 

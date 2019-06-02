@@ -18,7 +18,7 @@ trait TypeElaborators { self: Elaborators =>
       case Variable(id) => for {
         i <- TypeUseIdE.elaborate(id)
         (st, et) <- Constrained.attempt(store.getType(i).orElse(store.getTypeConstructor(i).flatMap { (n: Int) =>
-          if (n == 0) Some((SimpleTypes.ADTType(i, Seq()), Eventual.pure(trees.ADTType(i, Seq()))))
+          if (n == 0) Some((SimpleTypes.ADTType(i, Seq()).setPos(template.pos), Eventual.pure(trees.ADTType(i, Seq()))))
           else None
         }), template, typeConstructorUsedAsTypeVariable(i.name))
       } yield (st.withPos(template.pos), et)

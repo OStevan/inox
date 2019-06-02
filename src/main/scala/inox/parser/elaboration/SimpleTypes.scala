@@ -23,7 +23,8 @@ trait SimpleTypes { self: Trees =>
         case BagType(t) => BagType(t).setPos(pos)
         case MapType(f, t) => MapType(f, t).setPos(pos)
         case TupleType(ts) => TupleType(ts).setPos(pos)
-        case ADTType(i, as) => ADTType(i, as).setPos(pos)
+        case ADTType(i, as) =>
+          ADTType(i, as).setPos(pos)
         case TypeParameter(id) => TypeParameter(id).setPos(pos)
         case u: Unknown => u.copy().setPos(pos)
         case _ => this
