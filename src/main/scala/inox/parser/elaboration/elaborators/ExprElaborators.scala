@@ -11,7 +11,6 @@ trait ExprElaborators { self: Elaborators =>
 
   class ExprE extends Elaborator[Expr, (SimpleTypes.Type, Eventual[trees.Expr])] {
     override def elaborate(template: Expr)(implicit store: Store): Constrained[(SimpleTypes.Type, Eventual[trees.Expr])] = {
-      assert(template.pos != NoPosition)
       template match {
         case ExprHole(index) => Constrained.attempt(store.getHole[trees.Expr](index), template, invalidHoleType("Expr")).flatMap { expr =>
           Constrained.attempt(SimpleTypes.fromInox(expr.getType(store.getSymbols)).map(_.setPos(template.pos)), template, invalidInoxExpr(expr)).map { st =>
