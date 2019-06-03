@@ -52,6 +52,11 @@ trait TypeGraphAnalysis extends GraphStructure
             testConsistency(start, end, hops, pathFinder).foreach(path => unsatisfiable = path :: unsatisfiable
             )
           }
+
+          if (pathFinder.hasIntersectEdge(start, end)) {
+            val hops: List[Edge] = pathFinder.getPath(start, end)
+            testConsistency(start, end, hops, pathFinder).foreach(path => unsatisfiable = path :: unsatisfiable)
+          }
         }
       }
 
