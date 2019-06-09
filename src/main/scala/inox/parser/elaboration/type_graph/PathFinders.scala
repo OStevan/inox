@@ -59,6 +59,8 @@ trait PathFinders {
       to.accept(from)
     }
 
+    def intersect(from: Node, to: Node): Color = from.element.intersect(to.element)
+
     /**
       * Method to get the first element in a path
       *
@@ -93,7 +95,7 @@ trait PathFinders {
         return true
 
 
-      false
+      intersect(from, to)
     }
 
     /**

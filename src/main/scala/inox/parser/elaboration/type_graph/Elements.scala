@@ -12,6 +12,7 @@ trait Elements {
     * Encapsulates type classes and types for easier graph manipulation, uses also underlying position of types and classes
     */
   trait Element {
+
     def typeInformation: String
 
 
@@ -103,10 +104,16 @@ trait Elements {
 
     def accept(other: Element): Boolean = (this, other) match {
       case (first: TypeClassElement, second: TypeElement) => first.typeClass.accepts(second.tpe).isInstanceOf[Some[Seq[Constraint]]]
-      case (first: TypeClassElement, second: TypeClassElement) =>
-        //TODO check with Romain
+      case (_: TypeClassElement, _: TypeClassElement) =>
         false
       case (first: TypeElement, second: TypeElement) => accept(first.tpe, second.tpe)
+      case _ => false
+    }
+
+    def intersect(other: Element): Boolean = (this, other) match {
+      case (TypeClassElement(first, _), TypeClassElement(second, _)) =>
+        // add dummy type for intersection check
+        first.combine(second)(SimpleTypes.Unknown.fresh).isInstanceOf[Some[Seq[Constraint]]]
       case _ => false
     }
 

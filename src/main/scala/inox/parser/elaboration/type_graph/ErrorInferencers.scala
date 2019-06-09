@@ -2,8 +2,6 @@ package inox.parser.elaboration.type_graph
 
 import inox.parser.elaboration.SimpleTypes
 
-import scala.util.parsing.input.Position
-
 trait ErrorInferencers {
   self: PathFinders with ErrorReasons with ErrorReasonSearch with GraphStructure with SimpleTypes with Elements =>
 
@@ -65,10 +63,5 @@ trait ErrorInferencers {
     override def algorithm(candidates: Set[Entity]): HeuristicSearchAlgorithm = {
       new ExplanationFinder(candidates.toArray, paths.toList, 4)
     }
-  }
-
-
-  class MinCutFinder (unsatisfiablePaths: List[GraphPath], candidates: Array[Entity], suboptimal: Int)
-    extends ExplanationFinder(candidates, unsatisfiablePaths, suboptimal, 1, 0) {
   }
 }

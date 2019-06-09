@@ -2,7 +2,6 @@ package inox.parser.elaboration.type_graph
 
 import inox.parser.ElaborationErrors
 import inox.parser.elaboration.SimpleTypes
-
 import scala.util.parsing.input.Position
 
 trait ErrorReasons {
@@ -27,17 +26,9 @@ trait ErrorReasons {
     */
   abstract class Entity(val pos: Position, val satisfiablePathsCount: Int) {
 
-    /**
-      * Checks if this entity gives a reason why an error happened, in case of expressions it should appear on a path
-      *
-      * @param path represents and unsatisfiable path between two nodes for which we are searching for an explanation
-      * @return flag if it in fact explains the reason why the path is unsatisfiable
-      */
     def explainsPath(path: GraphPath): Boolean
 
     def toErrorMessage(diagnosis: GraphDiagnosis): String
-
-    override def equals(obj: Any): Boolean
   }
 
   /**
@@ -45,12 +36,6 @@ trait ErrorReasons {
     */
   case class TypeEntity(element: Element, satisfiableCount: Int) extends Entity(element.position, satisfiableCount) {
 
-    /**
-      * Checks if this entity gives a valid reason why the expression is not satisfiable
-      *
-      * @param path represents and unsatisfiable path between two nodes for which we are searching for an explanation
-      * @return flag if it in fact explains the reason why the path is unsatisfiable
-      */
     override def explainsPath(path: GraphPath): Boolean = {
       path.pathNodes().exists(node => node.element == element)
     }
@@ -61,4 +46,5 @@ trait ErrorReasons {
         unsatisfiablePaths.map(elem => withPosition(elem.typeInformation + " is a conflicting type")(elem.position)).mkString("\n")
     }
   }
+
 }

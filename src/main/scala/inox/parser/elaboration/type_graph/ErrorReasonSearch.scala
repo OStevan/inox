@@ -27,8 +27,7 @@ trait ErrorReasonSearch { self: PathFinders with ErrorReasons =>
       * @param estimation cost for this node
       */
     protected class SearchNode(val entities: Set[Entity], val candidate: Entity, val index: Int,
-                               val remaining: Seq[GraphPath], val estimation: Double) {
-    }
+                               val remaining: Seq[GraphPath], val estimation: Double)
 
     /**
       * ordering to be used for a priority queue representing the search frontier
@@ -120,7 +119,6 @@ trait ErrorReasonSearch { self: PathFinders with ErrorReasons =>
     var dependency: Map[Entity, Set[GraphPath]] = Map()
     var duplicateExists = false
     var increment = 1
-    var duplicateIncrement = 1
 
 
     def this(candidates: Array[Entity], paths: List[GraphPath], suboptimal: Int, C1: Double, C2: Double) = {
@@ -132,14 +130,9 @@ trait ErrorReasonSearch { self: PathFinders with ErrorReasons =>
       var can: Set[Entity] = Set()
       for (entity <- candidates) {
         dependency = dependency.updated(entity, mapsTo(entity))
-        if (candidates.contains(entity))
-          duplicateExists = true
-        else
+        if (!candidates.contains(entity))
           can = can.+(entity)
       }
-
-      if (duplicateExists)
-        increment = duplicateIncrement
     }
 
     /**
