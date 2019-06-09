@@ -29,7 +29,7 @@ trait GraphStructure {
       */
     def entityInformationEquality(other: Node): Boolean = element.informationEquality(other.element)
 
-    def incSatisfiableCount(): Unit = counter = counter + 1
+    def incrementSatisfiable(): Unit = counter = counter + 1
 
     def satisfiableCount(): Int = counter
 

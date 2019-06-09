@@ -4,28 +4,29 @@ import inox.parser.elaboration.{Constraints, SimpleTypes}
 
 import scala.collection.mutable
 
+/**
+  * Trait for giving path finding abilities.
+  */
 trait PathFinders {
   self: GraphStructure with Constraints with SimpleTypes with Elements =>
 
   /**
-    * Class representing a path found by path finders
+    * Class representing a path found by path finders.
     *
     * @param edges  constructing a path
     * @param finder used to generate the path
     */
-  class GraphPath(val edges: Array[Edge], val finder: PathFinder) {
-    assert(edges.length != 0, "Path should have some edges connecting the two ")
+  protected class GraphPath(val edges: Array[Edge], val finder: PathFinder) {
+    assert(edges.length != 0, "Path should have at least one edge along its path ")
 
     /**
-      * increment the counter of the successful paths
-      *
-      * @return
+      * Increment the number of satisfiable paths passing through elements along the path.
       */
-    def incSatisfiableCount(): Unit = {
+    def incrementSatisfiable(): Unit = {
       var edgeSet: Set[Edge] = Set.empty
       var nodeSet: Set[Node] = Set.empty
 
-      firstInPath().incSatisfiableCount()
+      firstInPath().incrementSatisfiable()
 
       nodeSet = nodeSet + firstInPath()
 
@@ -35,18 +36,17 @@ trait PathFinders {
           edgeSet = edgeSet + edges(k)
         }
         if (!nodeSet.contains(edges(k).to())) {
-          edges(k).to().incSatisfiableCount()
+          edges(k).to().incrementSatisfiable()
           nodeSet += edges(k).to()
         }
       }
     }
 
     /**
-      * TODO maybe change this to be more generic?
       * Checks of from is less or equal to to structurally, without any prior knowledge
       *
-      * @param from
-      * @param to
+      * @param from start node of the path
+      * @param to   end node of the path
       * @return
       */
     private def leq(from: Node, to: Node): Boolean = {
@@ -73,6 +73,13 @@ trait PathFinders {
       */
     def lastInPath(): Node = edges(edges.length - 1).to()
 
+    /**
+      * Checks if a path between two nodes is satisfiable
+      *
+      * @param from start node of the path
+      * @param to   end node of the path
+      * @return if the path is satisfiable
+      */
     private def satisfiable(from: Node, to: Node): Boolean = {
 
 
@@ -90,9 +97,9 @@ trait PathFinders {
     }
 
     /**
-      * checks if the path is satisfiable having the constraint in mind
+      * Checks if the path is satisfiable.
       *
-      * @return
+      * @return path satisfiable flag
       */
     def isSatisfiablePath: Boolean = {
       if (edges.length == 0)
@@ -117,16 +124,7 @@ trait PathFinders {
     }
 
     /**
-      * if the path is unsatisfiable mark path as contributing
-      *
-      * @return
-      */
-    def markCause() = {
-      // TODO add marking cause
-    }
-
-    /**
-      * Checks if the path is satisfiable
+      * Checks if the path is unsatisfiable
       *
       * @return
       */
@@ -151,8 +149,8 @@ trait PathFinders {
       if (firstInPath().isTrivialEnd || lastInPath().isTrivialEnd)
 
       // path is trivially satisfiable
-      if (firstInPath() entityInformationEquality lastInPath())
-        return false
+        if (firstInPath() entityInformationEquality lastInPath())
+          return false
 
       // compatible types
       if (lastInPath() accept firstInPath())
@@ -163,7 +161,6 @@ trait PathFinders {
 
       val leqElements: mutable.Stack[Node] = mutable.Stack()
       val constructorConditions: mutable.Stack[(Int, Edges.ConstructorEdgeDirection.Direction)] = mutable.Stack()
-      val length = 0
       val firstNode = firstInPath()
       leqElements.push(firstNode)
 
@@ -191,7 +188,7 @@ trait PathFinders {
             !satisfiable(leqElements.top, edge.to()) &&
             // we have reached the same element from were we started
             // edge from is the same as edge to
-            !(leqElements.top entityInformationEquality  firstInPath()) && (edge.to() entityInformationEquality lastInPath()))
+            !(leqElements.top entityInformationEquality firstInPath()) && (edge.to() entityInformationEquality lastInPath()))
             return false
           else if (!edge.to().hasVars) {
             leqElements.pop()
@@ -246,28 +243,31 @@ trait PathFinders {
     protected case class LeftEdge(from: Node, to: Node, position: Int, length: Int) extends ReductionEdge
 
     /**
-      * RIGHT := decompositional
-      * RIGHT := LEQ RIGHT (position is inherited from the child right)
-      *
-      * @param from     node
-      * @param to       node
-      * @param position position in the constructor
-      * @param size
+      * Right edges are always of length 1 and are not represented with a class.
       */
-    protected case class RightEdge(from: Node, to: Node, position: Int, size: Int) extends ReductionEdge
+
 
     /**
       * Model a reverse edge connecting type class with a type
-      * @param from
-      * @param to
+      *
+      * @param from node of an edge
+      * @param to   node of the edge
       */
     protected case class ReverseEdge(from: Node, to: Node) extends ReductionEdge {
       assert(from.element.isInstanceOf[TypeClassElement])
     }
 
+    /**
+      * Original edges are not represented with specific classes for the same reason as Right edges.
+      * Intersection edges are only used as an end result so they are not stored in intermediate steps.
+      */
+
+
     def getPath(from: Node, to: Node): List[Edge]
 
-    def hasLeqEdge(start: Node, end: Node): Boolean
+    def hasLeqEdge(from: Node, to: Node): Boolean
+
+    def hasIntersectionEdge(from: Node, to: Node): Boolean
   }
 
   /**
@@ -277,18 +277,25 @@ trait PathFinders {
 
     protected class Evidence(val from: Node, val to: Node)
 
-
     var graph: Graph = _
-    protected val nextHop: mutable.Map[Node, mutable.Map[Node, List[Evidence]]] = mutable.Map()
-    private val inferredLR: mutable.Map[Node, mutable.Set[Node]] = mutable.Map()
 
+    protected val nextHop: mutable.Map[Node, mutable.Map[Node, List[Evidence]]] = mutable.Map()
+    private val atomicEdges: mutable.Map[Node, mutable.Set[Node]] = mutable.Map()
+
+
+    // public
     def this(graph: Graph) = {
       this()
       this.graph = graph
     }
 
+    override def getPath(from: Node, to: Node): List[Edge] = {
+      getLeqPath(from, to)
+    }
+
     def inferLeqEdge(from: Node, to: Node, length: Int, evidence: List[Evidence], atomic: Boolean)
 
+    // protected
     protected def addNextHop(start: Node, end: Node, evidence: List[Evidence]): Unit = {
       nextHop.getOrElseUpdate(start, mutable.Map[Node, List[Evidence]]()).getOrElseUpdate(end, evidence)
     }
@@ -302,15 +309,11 @@ trait PathFinders {
     }
 
     protected def addAtomicLeqEdge(from: Node, to: Node): Unit = {
-      inferredLR.getOrElseUpdate(from, new mutable.HashSet[Node]()).add(to)
+      atomicEdges.getOrElseUpdate(from, new mutable.HashSet[Node]()).add(to)
     }
 
     protected def hasAtomicEdge(from: Node, to: Node): Boolean = {
-      inferredLR.getOrElseUpdate(from, new mutable.HashSet[Node]()).contains(to)
-    }
-
-    override def getPath(from: Node, to: Node): List[Edge] = {
-      getLeqPath(from, to)
+      atomicEdges.getOrElseUpdate(from, new mutable.HashSet[Node]()).contains(to)
     }
 
     protected def getLeqPath(from: Node, to: Node): List[Edge] = {
@@ -344,9 +347,63 @@ trait PathFinders {
             return ReverseEdge(from, to)
         }
       }
-
       null
     }
+
+    protected def hasRightEdge(from: Node, to: Node, position: Int): Boolean
+
+    protected def hasOriginalEdge(from: Node, to: Node): Boolean
+
+    protected def hasReverseEdge(from: Node, to: Node): Boolean
+
+    // CFG rules to be implemented by concrete path finders
+
+    /**
+      * apply rule LEQ = LEQ LEQ
+      *
+      * @param from node of the new edge
+      * @param mid  node connecting the two existing edges
+      * @param to   node edging the new edge
+      */
+    protected def ruleLeqLeq(from: Node, mid: Node, to: Node): Unit
+
+    /**
+      * apply rule LEFT = LEFT LEQ
+      *
+      * @param from     node of the new edge
+      * @param mid      node connecting the two existing edges
+      * @param to       node ending the new edge
+      * @param position position in the constructor of the LEFT edge from the right-hand side
+      */
+    protected def ruleLeftLeq(from: Node, mid: Node, to: Node, position: Int): Unit
+
+    /**
+      * apply rule REV = REV LEQ
+      *
+      * @param from node starting the new edge
+      * @param mid  node connecting the two existing edges
+      * @param to   node ending the new edge
+      */
+    protected def ruleReverseLeq(from: Node, mid: Node, to: Node): Unit
+
+    /**
+      * apply rule LEQ = LEFT RIGHT
+      *
+      * @param from     node staring the new edge
+      * @param mid      node connecting the two edges
+      * @param to       node ending the new path
+      * @param position inside the constructor on which two edges need to agree
+      */
+    protected def ruleLeftRight(from: Node, mid: Node, to: Node, position: Int): Unit
+
+    /**
+      * apply rule INTERSECT = REVERSE ORIGINAL
+      *
+      * @param from node starting the new edge
+      * @param mid  node connecting the two edges
+      * @param to   node ending the new edge
+      */
+    protected def ruleReverseOriginal(from: Node, mid: Node, to: Node): Unit
   }
 
 
@@ -359,20 +416,17 @@ trait PathFinders {
     private val shortestLEQPaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()
     private val shortestReversePaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()
     private val shortestIntersectPaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()
+    private val shortestLeftPaths = new mutable.HashMap[Node, mutable.Map[Node, mutable.Map[Int, Int]]]()
+    private var rightEdges: Map[Node, Map[Node, Int]] = Map.empty
+    private var originalEdges: Map[Node, Set[Node]] = Map.empty
 
     // used for expanding
     private var constructorNodes: Map[Node, List[Node]] = Map.empty
     private var trace: Map[Node, Set[Edge]] = Map.empty
 
-
-    /**
-      * map from node to map of node to map of position to length
-      */
-    val shortestLeftPaths = new mutable.HashMap[Node, mutable.Map[Node, mutable.Map[Int, Int]]]()
+    // queue representing the context free reachability frontier
     val queue: mutable.Queue[ReductionEdge] = mutable.Queue[ReductionEdge]()
 
-    var rightEdges: Map[Node, Map[Node, Int]] = Map.empty
-    var originalEdges: Map[Node, Set[Node]] = Map.empty
 
     for (node <- graph.nodes
          if node.isConstructor) {
@@ -398,53 +452,60 @@ trait PathFinders {
       }
     }
 
+    override def hasRightEdge(from: Node, to: Node, position: Int): Boolean = {
+      if (rightEdges.contains(from))
+        rightEdges(from).getOrElse(to, -1) == position
+      else
+        false
+    }
 
-    /**
-      * Infers less or equal edge, if element of to node is a type class adds a ReverseEdge (special type to model partial
-      * paths for type classes)
-      *
-      * @param from
-      * @param to
-      * @param length
-      * @param evidence
-      * @param atomic
-      */
+    override def hasOriginalEdge(from: Node, to: Node): Boolean = {
+      if (originalEdges.contains(from))
+        originalEdges(from).contains(to)
+      else
+        false
+    }
+
+
+    override def hasReverseEdge(from: Node, to: Node): Boolean = getShortestReverse(from, to) != INFINITY
+
+
+    // new edge inference either from constructed graph of using
     override def inferLeqEdge(from: Node, to: Node, length: Int, evidence: List[Evidence], atomic: Boolean): Unit = {
       if (from entityInformationEquality to)
         return
       addNextHop(from, to, evidence)
       queue.enqueue(LessEqual(from, to, length))
-      setShortestLeq(from, to, length)
+      setShortestLeqLength(from, to, length)
       if (atomic)
         addAtomicLeqEdge(from, to)
     }
 
-    def inferLeftEdge(from: Node, to: Node, length: Int, evidence: List[Evidence], position: Int, atomic: Boolean): Unit = {
+    protected def inferLeftEdge(from: Node, to: Node, length: Int, evidence: List[Evidence], position: Int, atomic: Boolean): Unit = {
       if (from entityInformationEquality to)
         return
       addNextHop(from, to, evidence)
       queue.enqueue(LeftEdge(from, to, position, length))
-      setShortestLeft(from, to, position, length)
+      setShortestLeftLength(from, to, position, length)
     }
 
-    def inferReverse(from: Node, to: Node, size: Int, evidence: List[Evidence], atomic: Boolean): Unit = {
+    protected def inferReverse(from: Node, to: Node, length: Int, evidence: List[Evidence], atomic: Boolean): Unit = {
       if (from entityInformationEquality to)
         return
       addNextHop(from, to, evidence)
       queue.enqueue(ReverseEdge(from, to))
-      setShortestReverse(from, to, size)
+      setShortestReverse(from, to, length)
     }
 
-    def inferIntersectEdge(from: Node, to: Node, length: Int, evidence: List[ShortestPathFinder.this.Evidence]): Unit = {
+    protected def inferIntersectEdge(from: Node, to: Node, length: Int, evidence: List[ShortestPathFinder.this.Evidence]): Unit = {
       if (to entityInformationEquality from)
         return
       addNextHop(from, to, evidence)
       setShortestIntersect(from, to, length)
     }
 
-    /**
-      * Not the best solution
-      */
+
+    // keep information about simple edges
     def insertRightEdge(from: Node, to: Node, position: Int): Unit = {
       rightEdges = rightEdges.updated(from, rightEdges.getOrElse(from, Map[Node, Int]()).updated(to, position))
     }
@@ -454,41 +515,28 @@ trait PathFinders {
     }
 
     // LEQ shortest path helpers
-
-    /**
-      * length of the currently found shortest path
-      *
-      * @param start node of the path
-      * @param end   node of the path
-      * @return length of the path or <code>INFINITY</code> if the path does not exist
-      */
-    private def getShortestLeq(start: Node, end: Node): Int =
+    private def getShortestLeqLength(start: Node, end: Node): Int =
       shortestLEQPaths.getOrElse(start, mutable.Map[Node, Int]()).getOrElse(end, INFINITY)
 
-    /**
-      * sets the new shortest path size between the two nodes
-      *
-      * @param start  node of the path
-      * @param end    node of the path
-      * @param length length of the path connecting the two
-      */
-    private def setShortestLeq(start: Node, end: Node, length: Int): Unit =
+
+    private def setShortestLeqLength(start: Node, end: Node, length: Int): Unit =
       shortestLEQPaths.getOrElseUpdate(start, mutable.Map[Node, Int]()).update(end, length)
 
     // LEFT shortest path helpers
-    def setShortestLeft(from: Node, to: Node, position: Int, length: Int): Unit = {
+    def setShortestLeftLength(from: Node, to: Node, position: Int, length: Int): Unit = {
       shortestLeftPaths.getOrElseUpdate(from, mutable.HashMap.empty)
         .getOrElseUpdate(to, mutable.HashMap.empty)
         .getOrElseUpdate(position, length)
     }
 
-    private def getShortestLeft(from: Node, to: Node, position: Int): Int = {
+    private def getShortestLeftLength(from: Node, to: Node, position: Int): Int = {
       shortestLeftPaths
         .getOrElse(from, mutable.Map[Node, mutable.Map[Int, Int]]())
         .getOrElse(to, mutable.Map[Int, Int]())
         .getOrElse(position, INFINITY)
     }
 
+    // REVERSE shortest path helpers
     def setShortestReverse(from: Node, to: Node, length: Int): Unit = {
       assert(from.element.isInstanceOf[TypeClassElement])
       shortestReversePaths.getOrElseUpdate(from, mutable.Map[Node, Int]()).update(to, length)
@@ -497,9 +545,7 @@ trait PathFinders {
     def getShortestReverse(from: Node, to: Node): Int =
       shortestReversePaths.getOrElse(from, mutable.Map[Node, Int]()).getOrElse(to, INFINITY)
 
-    def hasReverseEdge(from: Node, to: Node): Boolean = getShortestReverse(from, to) != INFINITY
-
-
+    // INTERSECT shortest path helpers
     def setShortestIntersect(from: Node, to: Node, length: Int): Unit = {
       shortestLEQPaths.getOrElseUpdate(from, mutable.Map[Node, Int]()).update(to, length)
     }
@@ -508,63 +554,43 @@ trait PathFinders {
       shortestIntersectPaths.getOrElse(from, mutable.Map[Node, Int]()).getOrElse(to, INFINITY)
     }
 
-    // CFG shortest path rules
-    /**
-      * apply rule LEQ = LEQ LEQ
-      *
-      * @param from node of the new edge
-      * @param mid  node connecting the two existing edges
-      * @param to   node edging the new edge
-      */
-    private def ruleLeqLeq(from: Node, mid: Node, to: Node): Unit = {
+    // CFG shortest path rules implementation
+    override protected def ruleLeqLeq(from: Node, mid: Node, to: Node): Unit = {
       if (from entityInformationEquality to)
         return
-      val leftDistance = getShortestLeq(from, mid)
-      val rightDistance = getShortestLeq(mid, to)
-      val currentDistance = getShortestLeq(from, to)
+      val leftDistance = getShortestLeqLength(from, mid)
+      val rightDistance = getShortestLeqLength(mid, to)
+      val currentDistance = getShortestLeqLength(from, to)
 
       if (leftDistance == INFINITY || rightDistance == INFINITY)
         return
       if (leftDistance + rightDistance < currentDistance) {
-        setShortestLeq(from, to, leftDistance + rightDistance)
+        setShortestLeqLength(from, to, leftDistance + rightDistance)
         inferLeqEdge(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)), atomic = false)
       }
 
     }
 
-    /**
-      * apply rule LEFT = LEFT LEQ
-      * @param from
-      * @param mid
-      * @param to
-      * @param position
-      */
-    def ruleLeftLeq(from: Node, mid: Node, to: Node, position: Int): Unit = {
+    override protected def ruleLeftLeq(from: Node, mid: Node, to: Node, position: Int): Unit = {
       if (from entityInformationEquality to)
         return
-      val leftDistance = getShortestLeft(from, mid, position)
-      val rightDistance = getShortestLeq(mid, to)
-      val currentDistance = getShortestLeft(from, to, position)
+      val leftDistance = getShortestLeftLength(from, mid, position)
+      val rightDistance = getShortestLeqLength(mid, to)
+      val currentDistance = getShortestLeftLength(from, to, position)
 
       if (leftDistance == INFINITY || rightDistance == INFINITY)
         return
       if (leftDistance + rightDistance < currentDistance) {
-        setShortestLeft(from, to, position, leftDistance + rightDistance)
+        setShortestLeftLength(from, to, position, leftDistance + rightDistance)
         inferLeftEdge(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)), atomic = false, position = position)
       }
     }
 
-    /**
-      * apply rule REV = REV LEQ
-      * @param from
-      * @param mid
-      * @param to
-      */
-    def ruleReverseLeq(from: Node, mid: Node, to: Node): Unit = {
+    override protected def ruleReverseLeq(from: Node, mid: Node, to: Node): Unit = {
       if (from entityInformationEquality to)
         return
       val leftDistance = getShortestReverse(from, mid)
-      val rightDistance = getShortestLeq(mid, to)
+      val rightDistance = getShortestLeqLength(mid, to)
       val currentDistance = getShortestReverse(from, to)
 
       if (leftDistance == INFINITY || rightDistance == INFINITY)
@@ -575,55 +601,24 @@ trait PathFinders {
       }
     }
 
-    def hasRightEdge(from: Node, to: Node, position: Int): Boolean = {
-      if (rightEdges.contains(from))
-        rightEdges(from).getOrElse(to, -1) == position
-      else
-        false
-    }
 
-    def hasOriginalEdge(from: Node, to: Node): Boolean = {
-      if (originalEdges.contains(from))
-        originalEdges(from).contains(to)
-      else
-        false
-    }
-
-    def hasIntersectEdge(from: Node, to: Node): Boolean = {
-      getShortestIntersect(from, to) != INFINITY
-    }
-
-    /**
-      * apply rule LEQ = LEFT RIGHT
-      * @param from
-      * @param mid
-      * @param to
-      * @param position
-      */
-    def ruleLeftRight(from: Node, mid: Node, to: Node, position: Int): Unit = {
+    override protected def ruleLeftRight(from: Node, mid: Node, to: Node, position: Int): Unit = {
       if (from entityInformationEquality to)
         return
 
-      val leftDistance = getShortestLeft(from, mid, position)
-      val currentDistance = getShortestLeq(from, to)
+      val leftDistance = getShortestLeftLength(from, mid, position)
+      val currentDistance = getShortestLeqLength(from, to)
 
       if (leftDistance == INFINITY)
         return
       if (leftDistance + 1 < currentDistance) {
-        setShortestLeq(from, to, leftDistance + 1)
+        setShortestLeqLength(from, to, leftDistance + 1)
         inferLeqEdge(from, to, leftDistance + 1, List(new Evidence(from, mid), new Evidence(mid, to)), atomic = false)
       }
-
     }
 
-    /**
-      * apply rule INTERSECT = REVERSE ORIGINAL
-      *
-      * @param from
-      * @param to
-      * @return
-      */
-    def ruleReverseOriginal(from: Node, mid: Node, to: Node): Unit = {
+
+    override protected def ruleReverseOriginal(from: Node, mid: Node, to: Node): Unit = {
       if (from entityInformationEquality to)
         return
       val reverseDistance = getShortestReverse(from, mid)
@@ -637,6 +632,11 @@ trait PathFinders {
         inferIntersectEdge(from, to, reverseDistance + 1, List(new Evidence(from, mid), new Evidence(mid, to)))
       }
     }
+
+    override def hasIntersectionEdge(from: Node, to: Node): Boolean = {
+      getShortestIntersect(from, to) != INFINITY
+    }
+
 
     def compatibleConstructors(constructorFrom: Node, constructorTo: Node): Boolean =
       constructorFrom.compatibleConstructors(constructorTo)
@@ -727,8 +727,8 @@ trait PathFinders {
                 var evidence: Seq[Evidence] = Seq.empty
                 fromChildren.zip(toChildren).foreach {
                   pair =>
-                    if (getShortestLeq(pair._1, pair._2) < INFINITY) {
-                      size += getShortestLeq(pair._1, pair._2)
+                    if (getShortestLeqLength(pair._1, pair._2) < INFINITY) {
+                      size += getShortestLeqLength(pair._1, pair._2)
                       evidence = evidence :+ new Evidence(pair._1, pair._2)
                     } else
                       size += 1
@@ -780,7 +780,7 @@ trait PathFinders {
 
     }
 
-    override def hasLeqEdge(start: Node, end: Node): Boolean = getShortestLeq(start, end) != INFINITY
+    override def hasLeqEdge(start: Node, end: Node): Boolean = getShortestLeqLength(start, end) != INFINITY
   }
 
 }

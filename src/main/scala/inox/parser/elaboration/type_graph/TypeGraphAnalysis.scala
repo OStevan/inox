@@ -25,13 +25,12 @@ trait TypeGraphAnalysis extends GraphStructure
 
       if (path.isInformative) {
         if (path.isUnsatisfiable) {
-          path.markCause()
           Some(path)
         } else {
           if (path.isValidPath) {
-            path.incSatisfiableCount()
+            path.incrementSatisfiable()
           } else if (path.isSatisfiablePath) {
-            path.incSatisfiableCount()
+            path.incrementSatisfiable()
             // here is where expansion is should be done
           }
           None
@@ -53,7 +52,7 @@ trait TypeGraphAnalysis extends GraphStructure
             )
           }
 
-          if (pathFinder.hasIntersectEdge(start, end)) {
+          if (pathFinder.hasIntersectionEdge(start, end)) {
             val hops: List[Edge] = pathFinder.getPath(start, end)
             testConsistency(start, end, hops, pathFinder).foreach(path => unsatisfiable = path :: unsatisfiable)
           }
@@ -73,13 +72,12 @@ trait TypeGraphAnalysis extends GraphStructure
 
       for (other <- graph.nodes) {
         if (pathFinder.hasLeqEdge(node, other)) {
-          // skolem check is not needed
           val hops: List[Edge] = pathFinder.getPath(node, other)
-          testConsistency(node, other, hops, pathFinder).foreach(elem => pairs = pairs + other.element)
+          testConsistency(node, other, hops, pathFinder).foreach(_ => pairs = pairs + other.element)
         }
         if (pathFinder.hasLeqEdge(other, node)) {
           val hops: List[Edge] = pathFinder.getPath(other, node)
-          testConsistency(other, node, hops, pathFinder).foreach(elem => pairs = pairs + other.element)
+          testConsistency(other, node, hops, pathFinder).foreach(_ => pairs = pairs + other.element)
         }
       }
 
