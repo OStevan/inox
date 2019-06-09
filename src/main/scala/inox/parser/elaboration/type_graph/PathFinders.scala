@@ -83,13 +83,8 @@ trait PathFinders {
       * @return if the path is satisfiable
       */
     private def satisfiable(from: Node, to: Node): Boolean = {
-
-
-      // TODO finish this
       if (from entityInformationEquality to)
         return true
-
-      // TODO add for constructors
 
       if (leq(from, to))
         return true
@@ -186,7 +181,6 @@ trait PathFinders {
           // there are still non processed nodes
           if (leqElements.nonEmpty &&
             // path until here is not satisfiable
-            // TODO see how to change this
             !satisfiable(leqElements.top, edge.to()) &&
             // we have reached the same element from were we started
             // edge from is the same as edge to
