@@ -60,9 +60,9 @@ trait GraphStructure {
 
     def satisfiableCount(): Int = counter
 
-    def from(): Node
+    def from: Node
 
-    def to(): Node
+    def to: Node
   }
 
   object Edges {

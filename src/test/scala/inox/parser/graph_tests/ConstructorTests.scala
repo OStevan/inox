@@ -104,4 +104,33 @@ class ConstructorTests extends FunSuite {
     }
   }
 
+
+  test("conflict in ADT type parameter") {
+    try {
+      p"""
+          type List[A] = Cons(head: A, tail: List[A]) | Nil()
+
+          def dummy(xs: List[Int]): Integer =
+            1 + xs.head
+        """
+      fail("No errors detected, while there should be one")
+    } catch {
+      case InterpolatorException(text) =>
+        assert(text.contains("graph"), text)
+        println(text)
+    }
+  }
+
+  test("conflict between type classes") {
+    try {
+      e"""
+         (1)._1
+       """
+      fail("No errors detected, while there should be one")
+    } catch {
+      case InterpolatorException(text) =>
+        assert(text.contains("graph"), text)
+        println(text)
+    }
+  }
 }

@@ -35,9 +35,9 @@ trait PathFinders {
           edges(k).incSatisfiableCount()
           edgeSet = edgeSet + edges(k)
         }
-        if (!nodeSet.contains(edges(k).to())) {
-          edges(k).to().incrementSatisfiable()
-          nodeSet += edges(k).to()
+        if (!nodeSet.contains(edges(k).to)) {
+          edges(k).to.incrementSatisfiable()
+          nodeSet += edges(k).to
         }
       }
     }
@@ -66,14 +66,14 @@ trait PathFinders {
       *
       * @return node representing the start of the path
       */
-    def firstInPath(): Node = edges(0).from()
+    def firstInPath(): Node = edges(0).from
 
     /**
       * Method to get the last element of the path
       *
       * @return nore representing the end node of the path
       */
-    def lastInPath(): Node = edges(edges.length - 1).to()
+    def lastInPath(): Node = edges(edges.length - 1).to
 
     /**
       * Checks if a path between two nodes is satisfiable
@@ -162,13 +162,13 @@ trait PathFinders {
       leqElements.push(firstNode)
 
       for (edge <- edges) {
-        var shouldCompare = !edge.to().isTrivialEnd
+        var shouldCompare = !edge.to.isTrivialEnd
 
         edge match {
           case Edges.ConstructorEdge(_, _, dir, pos) =>
             if (constructorConditions.isEmpty || !(constructorConditions.top._1 == pos && constructorConditions.top._2 != dir)) {
               constructorConditions.push((pos, dir))
-              leqElements.push(edge.to())
+              leqElements.push(edge.to)
               shouldCompare = false
             } else {
               constructorConditions.pop()
@@ -181,14 +181,14 @@ trait PathFinders {
           // there are still non processed nodes
           if (leqElements.nonEmpty &&
             // path until here is not satisfiable
-            !satisfiable(leqElements.top, edge.to()) &&
+            !satisfiable(leqElements.top, edge.to) &&
             // we have reached the same element from were we started
             // edge from is the same as edge to
-            !(leqElements.top entityInformationEquality firstInPath()) && (edge.to() entityInformationEquality lastInPath()))
+            !(leqElements.top entityInformationEquality firstInPath()) && (edge.to entityInformationEquality lastInPath()))
             return false
-          else if (!edge.to().hasVars) {
+          else if (!edge.to.hasVars) {
             leqElements.pop()
-            leqElements.push(edge.to())
+            leqElements.push(edge.to)
           }
         }
       }
@@ -200,8 +200,8 @@ trait PathFinders {
     def pathNodes(): Seq[Node] = {
       var nodes: Set[Node] = Set.empty
       for (edge <- edges) {
-        nodes = nodes + edge.from()
-        nodes = nodes + edge.to()
+        nodes = nodes + edge.from
+        nodes = nodes + edge.to
       }
 
       nodes.toSeq
@@ -271,6 +271,8 @@ trait PathFinders {
     */
   abstract class CFLPathFinder extends PathFinder {
 
+    protected var nodeEdgesMap: Map[Node, Set[Edge]] = _
+
     protected class Evidence(val from: Node, val to: Node)
 
     var graph: Graph = _
@@ -331,15 +333,15 @@ trait PathFinders {
 
 
     protected def getOriginalEdge(from: Node, to: Node): Edge = {
-      val edges = graph.nodeEdgesMap.getOrElse(from, Set())
+      val edges = nodeEdgesMap.getOrElse(from, Set())
       for (edge <- edges)
-        if (edge.to() == to)
+        if (edge.to == to)
           return edge
 
       // hack for intersection edges
       if (from.element.isInstanceOf[TypeClassElement]) {
         for (edge <- graph.nodeEdgesMap.getOrElse(to, Set.empty)) {
-          if (edge.to() == from)
+          if (edge.to == from)
             return ReverseEdge(from, to)
         }
       }
@@ -407,7 +409,6 @@ trait PathFinders {
     * Finds shortest paths
     */
   class ShortestPathFinder(g: Graph) extends CFLPathFinder(g) {
-
     private val INFINITY = Int.MaxValue
     private val shortestLEQPaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()
     private val shortestReversePaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()
@@ -416,35 +417,38 @@ trait PathFinders {
     private var rightEdges: Map[Node, Map[Node, Int]] = Map.empty
     private var originalEdges: Map[Node, Set[Node]] = Map.empty
 
-    // used for expanding
-    private var constructorNodes: Map[Node, List[Node]] = Map.empty
-    private var trace: Map[Node, Set[Edge]] = Map.empty
+    // used for type class expanding
+    private var expandedTypes: Set[(TypeElement, TypeClassElement)] = Set.empty
+    private var expandedClasses: Set[(TypeClassElement, TypeClassElement)] = Set.empty
 
     // queue representing the context free reachability frontier
     val queue: mutable.Queue[ReductionEdge] = mutable.Queue[ReductionEdge]()
 
 
-    for (node <- graph.nodes
-         if node.isConstructor) {
-      initConstructorsFor(node.element, node)
-    }
 
-    init()
+    init(graph)
     saturation()
 
 
-    def init(): Unit = {
-      graph.edges.foreach {
-        case a: Edges.LessEqualEdge =>
-          inferLeqEdge(a.from, a.to, 1, List.empty, atomic = true)
-          if (a.to.element.isInstanceOf[TypeClassElement]) {
-            inferReverse(a.to, a.from, 1, List.empty, atomic = true)
-            insertOriginal(a.from, a.to)
-          }
-        case Edges.ConstructorEdge(from, to, Edges.ConstructorEdgeDirection.Original, position) =>
-          inferLeftEdge(from, to, 1, List.empty, position, atomic = true)
-        case Edges.ConstructorEdge(from, to, Edges.ConstructorEdgeDirection.Decompositional, position) =>
-          insertRightEdge(from, to, position)
+    def init(g: Graph): Unit = {
+      g.edges.foreach { edge =>
+        if (nodeEdgesMap == null)
+          nodeEdgesMap = g.nodeEdgesMap
+
+        nodeEdgesMap = nodeEdgesMap.updated(edge.from, nodeEdgesMap.getOrElse(edge.from, Set.empty) + edge)
+
+        edge match {
+          case a: Edges.LessEqualEdge =>
+            inferLeqEdge(a.from, a.to, 1, List.empty, atomic = true)
+            if (a.to.element.isInstanceOf[TypeClassElement]) {
+              inferReverse(a.to, a.from, 1, List.empty, atomic = true)
+              insertOriginal(a.from, a.to)
+            }
+          case Edges.ConstructorEdge(from, to, Edges.ConstructorEdgeDirection.Original, position) =>
+            inferLeftEdge(from, to, 1, List.empty, position, atomic = true)
+          case Edges.ConstructorEdge(from, to, Edges.ConstructorEdgeDirection.Decompositional, position) =>
+            insertRightEdge(from, to, position)
+        }
       }
     }
 
@@ -493,11 +497,13 @@ trait PathFinders {
       setShortestReverse(from, to, length)
     }
 
+
     protected def inferIntersectEdge(from: Node, to: Node, length: Int, evidence: List[ShortestPathFinder.this.Evidence]): Unit = {
       if (to entityInformationEquality from)
         return
       addNextHop(from, to, evidence)
       setShortestIntersect(from, to, length)
+      expandOnIntersect(from, to)
     }
 
 
@@ -634,106 +640,34 @@ trait PathFinders {
     }
 
 
-    def compatibleConstructors(constructorFrom: Node, constructorTo: Node): Boolean =
-      constructorFrom.compatibleConstructors(constructorTo)
+    private def addConstraints(constraints: Seq[Constraint]): Unit = {
+      val g = constructSeq(constraints)
+      init(g)
+    }
 
+    private def expandOnLEQ(equal: Edge): Unit = {
+      if (equal.from == equal.to)
+        return
+      (equal.from.element, equal.to.element) match {
+        case (first: TypeElement, second: TypeClassElement) if !expandedTypes.contains((first, second)) =>
+          expandedTypes = expandedTypes + ((first, second))
+          second.typeClass.accepts(first.tpe).foreach(constraints => addConstraints(constraints))
 
-    def initConstructorsFor(element: Element, node: Node): Unit = element match {
-      case _: TypeClassElement => ()
-      case TypeElement(tpe) => tpe match {
-        case SimpleTypes.BagType(elem) =>
-          initConstructorsFor(TypeElement(elem), node)
-        case SimpleTypes.SetType(elem) =>
-          initConstructorsFor(TypeElement(elem), node)
-        case SimpleTypes.MapType(from, to) =>
-          List(from, to).foreach(elem => {
-            initConstructorsFor(TypeElement(elem), node)
-          })
-        case SimpleTypes.ADTType(identifier, args) =>
-          args.foreach(elem => {
-            initConstructorsFor(TypeElement(elem), node)
-          })
-        case SimpleTypes.FunctionType(froms, to) =>
-          froms.foreach(elem => {
-            initConstructorsFor(TypeElement(elem), node)
-          })
-          initConstructorsFor(TypeElement(to), node)
-        case SimpleTypes.TupleType(elems) =>
-          elems.foreach(elem => {
-            initConstructorsFor(TypeElement(elem), node)
-          })
-        case simple =>
-          val (g, addedNode) = graph.addBlackNode(TypeElement(simple))
-          graph = g
-          constructorNodes = constructorNodes.updated(addedNode, constructorNodes.getOrElse(addedNode, List()) :+ node)
+        case _ => ()
       }
     }
 
-
-    def expandNode(original: Node, subst: Node, equal: LessEqual): Unit = {
-      if (constructorNodes.contains(original) && original.color == Black && subst.color == Black) {
-        constructorNodes(original).foreach(constructorNode => if (constructorNode.color == Black || !trace(constructorNode).contains(equal)) {
-          val replaced = constructorNode.element.replace(original.element, subst.element)
-          replaced.foreach(newElement => if (!graph.elementNodeMap.contains(newElement)) {
-            val (g, newNode) = graph.addWhiteNode(newElement)
-            graph = g
-            if (constructorNode.color == White)
-              trace = trace.updated(newNode, trace(constructorNode) + equal)
-            else
-              trace = trace.updated(newNode, Set.empty + equal)
-
-            initConstructorsFor(newElement, newNode)
-          })
-        })
-      }
-    }
-
-    def addMoreEdges(edge: LessEqual): Unit = {
-      val from = edge.from
-      val to = edge.to
-
-      if (constructorNodes.contains(from) || constructorNodes.contains(to)) {
-
-        expandNode(from, to, edge)
-        expandNode(to, from, edge)
-
-        if (constructorNodes.contains(from) && constructorNodes.contains(to)) {
-          for (constructorFrom <- constructorNodes(from)) {
-            for (constructorTo <- constructorNodes(to)
-                 if compatibleConstructors(constructorFrom, constructorTo)
-                 if !hasLeqEdge(from, to) || !hasLeqEdge(to, from)) {
-              // by tests we know that the node has to be type node
-              val fromChildren = graph.nodeEdgesMap(from).foldLeft(Seq[Edges.ConstructorEdge]()) {
-                (collector, edge) =>
-                  edge match {
-                    case e: Edges.ConstructorEdge if e.direction == Edges.ConstructorEdgeDirection.Decompositional => collector :+ e
-                    case _ => collector
-                  }
-              }.sortBy(edge => edge.position).map(_.to)
-              val toChildren = graph.nodeEdgesMap(to).foldLeft(Seq[Edges.ConstructorEdge]()) {
-                (collector, edge) =>
-                  edge match {
-                    case e: Edges.ConstructorEdge if e.direction == Edges.ConstructorEdgeDirection.Decompositional => collector :+ e
-                    case _ => collector
-                  }
-              }.sortBy(edge => edge.position).map(_.to)
-
-              if (fromChildren.zip(toChildren).forall(pair => hasLeqEdge(pair._1, pair._2))) {
-                var size = 0
-                var evidence: Seq[Evidence] = Seq.empty
-                fromChildren.zip(toChildren).foreach {
-                  pair =>
-                    if (getShortestLeqLength(pair._1, pair._2) < INFINITY) {
-                      size += getShortestLeqLength(pair._1, pair._2)
-                      evidence = evidence :+ new Evidence(pair._1, pair._2)
-                    } else
-                      size += 1
-                }
-                inferLeqEdge(constructorFrom, constructorTo, size, evidence.toList, atomic = true)
-              }
-            }
-          }
-        }
+    def expandOnIntersect(from: Node, to: Node): Unit = {
+      if (from == to)
+        return
+      (from.element, to.element) match {
+        case (first: TypeClassElement, second: TypeClassElement)
+          if !(expandedClasses.contains((first, second)) || expandedClasses.contains((second, first))) =>
+          expandedClasses = expandedClasses + ((first, second))
+          first.typeClass.combine(second.typeClass)(SimpleTypes.Unknown.fresh).foreach(constraints => addConstraints(constraints))
+        case (_: TypeClassElement, _: TypeClassElement) => ()
+        case _ =>
+          assert(assertion = false, "Should never happen")
       }
     }
 
@@ -747,7 +681,7 @@ trait PathFinders {
 
         // tryAddingExtraEdges, without constructors
         edge match {
-          case a: LessEqual => addMoreEdges(a)
+          case a: LessEqual => expandOnLEQ(a)
           case _ => ()
         }
 
