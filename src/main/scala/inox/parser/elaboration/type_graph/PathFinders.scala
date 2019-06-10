@@ -59,7 +59,7 @@ trait PathFinders {
       to.accept(from)
     }
 
-    def intersect(from: Node, to: Node): Color = from.element.intersect(to.element)
+    def combine(from: Node, to: Node): Boolean = from.element.combine(to.element)
 
     /**
       * Method to get the first element in a path
@@ -90,7 +90,7 @@ trait PathFinders {
         return true
 
 
-      intersect(from, to)
+      combine(from, to)
     }
 
     /**
@@ -255,7 +255,7 @@ trait PathFinders {
 
     /**
       * Original edges are not represented with specific classes for the same reason as Right edges.
-      * Intersection edges are only used as an end result so they are not stored in intermediate steps.
+      * Combine edges are only used as an end result so they are not stored in intermediate steps.
       */
 
 
@@ -263,7 +263,7 @@ trait PathFinders {
 
     def hasLeqEdge(from: Node, to: Node): Boolean
 
-    def hasIntersectionEdge(from: Node, to: Node): Boolean
+    def hasCombineEdge(from: Node, to: Node): Boolean
   }
 
   /**
@@ -338,7 +338,7 @@ trait PathFinders {
         if (edge.to == to)
           return edge
 
-      // hack for intersection edges
+      // hack for combine edges
       if (from.element.isInstanceOf[TypeClassElement]) {
         for (edge <- graph.nodeEdgesMap.getOrElse(to, Set.empty)) {
           if (edge.to == from)
@@ -395,7 +395,7 @@ trait PathFinders {
     protected def ruleLeftRight(from: Node, mid: Node, to: Node, position: Int): Unit
 
     /**
-      * apply rule INTERSECT = REVERSE ORIGINAL
+      * apply rule COMBINE = REVERSE ORIGINAL
       *
       * @param from node starting the new edge
       * @param mid  node connecting the two edges
@@ -412,7 +412,7 @@ trait PathFinders {
     private val INFINITY = Int.MaxValue
     private val shortestLEQPaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()
     private val shortestReversePaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()
-    private val shortestIntersectPaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()
+    private val shortestCombinePaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()
     private val shortestLeftPaths = new mutable.HashMap[Node, mutable.Map[Node, mutable.Map[Int, Int]]]()
     private var rightEdges: Map[Node, Map[Node, Int]] = Map.empty
     private var originalEdges: Map[Node, Set[Node]] = Map.empty
@@ -498,12 +498,12 @@ trait PathFinders {
     }
 
 
-    protected def inferIntersectEdge(from: Node, to: Node, length: Int, evidence: List[ShortestPathFinder.this.Evidence]): Unit = {
+    protected def inferCombineEdge(from: Node, to: Node, length: Int, evidence: List[ShortestPathFinder.this.Evidence]): Unit = {
       if (to entityInformationEquality from)
         return
       addNextHop(from, to, evidence)
-      setShortestIntersect(from, to, length)
-      expandOnIntersect(from, to)
+      setShortestCombine(from, to, length)
+      expandOnCombine(from, to)
     }
 
 
@@ -547,13 +547,13 @@ trait PathFinders {
     def getShortestReverse(from: Node, to: Node): Int =
       shortestReversePaths.getOrElse(from, mutable.Map[Node, Int]()).getOrElse(to, INFINITY)
 
-    // INTERSECT shortest path helpers
-    def setShortestIntersect(from: Node, to: Node, length: Int): Unit = {
+    // COMBINE shortest path helpers
+    def setShortestCombine(from: Node, to: Node, length: Int): Unit = {
       shortestLEQPaths.getOrElseUpdate(from, mutable.Map[Node, Int]()).update(to, length)
     }
 
-    def getShortestIntersect(from: Node, to: Node): Int = {
-      shortestIntersectPaths.getOrElse(from, mutable.Map[Node, Int]()).getOrElse(to, INFINITY)
+    def getShortestCombine(from: Node, to: Node): Int = {
+      shortestCombinePaths.getOrElse(from, mutable.Map[Node, Int]()).getOrElse(to, INFINITY)
     }
 
     // CFG shortest path rules implementation
@@ -624,19 +624,19 @@ trait PathFinders {
       if (from entityInformationEquality to)
         return
       val reverseDistance = getShortestReverse(from, mid)
-      val currentDistance = getShortestIntersect(from, to)
+      val currentDistance = getShortestCombine(from, to)
 
       if (reverseDistance == INFINITY)
         return
 
       if (reverseDistance + 1 < currentDistance) {
-        setShortestIntersect(from, to, reverseDistance + 1)
-        inferIntersectEdge(from, to, reverseDistance + 1, List(new Evidence(from, mid), new Evidence(mid, to)))
+        setShortestCombine(from, to, reverseDistance + 1)
+        inferCombineEdge(from, to, reverseDistance + 1, List(new Evidence(from, mid), new Evidence(mid, to)))
       }
     }
 
-    override def hasIntersectionEdge(from: Node, to: Node): Boolean = {
-      getShortestIntersect(from, to) != INFINITY
+    override def hasCombineEdge(from: Node, to: Node): Boolean = {
+      getShortestCombine(from, to) != INFINITY
     }
 
 
@@ -657,7 +657,7 @@ trait PathFinders {
       }
     }
 
-    def expandOnIntersect(from: Node, to: Node): Unit = {
+    def expandOnCombine(from: Node, to: Node): Unit = {
       if (from == to)
         return
       (from.element, to.element) match {

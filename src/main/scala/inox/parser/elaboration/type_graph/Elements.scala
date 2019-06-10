@@ -110,9 +110,9 @@ trait Elements {
       case _ => false
     }
 
-    def intersect(other: Element): Boolean = (this, other) match {
+    def combine(other: Element): Boolean = (this, other) match {
       case (TypeClassElement(first, _), TypeClassElement(second, _)) =>
-        // add dummy type for intersection check
+        // add dummy type for combine check
         first.combine(second)(SimpleTypes.Unknown.fresh).isInstanceOf[Some[Seq[Constraint]]]
       case _ => false
     }
