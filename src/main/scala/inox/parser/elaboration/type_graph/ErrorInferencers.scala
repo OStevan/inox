@@ -21,14 +21,14 @@ trait ErrorInferencers {
     /**
       * @return A set of entities that the inference is performed on
       */
-    def candidates(): Set[Entity]
+    def candidates(): Traversable[Entity]
 
     /**
       * @param candidates
       * Basic elements of possible explanations
       * @return Return an instance of heuristic search algorithm to use
       */
-    def algorithm(candidates: Set[Entity]): HeuristicSearchAlgorithm
+    def algorithm(candidates: Traversable[Entity]): HeuristicSearchAlgorithm
 
   }
 
@@ -43,16 +43,9 @@ trait ErrorInferencers {
     /**
       * @return A set of entities that the inference is performed on
       */
-    override def candidates(): Set[Entity] = {
-      var candidates: Set[Entity] = Set.empty
-
-      for (path <- paths) {
-        path.pathNodes().filter(node => !node.hasVars).foreach(node =>
-          candidates = candidates + TypeEntity(node.element, satisfiableCounts(node.element))
-        )
-      }
-
-      candidates
+    override def candidates(): Traversable[Entity] = {
+      paths.flatMap(path => List(TypeEntity(path.firstInPath().element, satisfiableCounts(path.firstInPath().element)),
+        TypeEntity(path.lastInPath().element, satisfiableCounts(path.lastInPath().element)))).toSet
     }
 
     /**
@@ -60,7 +53,7 @@ trait ErrorInferencers {
       * Basic elements of possible explanations
       * @return Return an instance of heuristic search algorithm to use
       */
-    override def algorithm(candidates: Set[Entity]): HeuristicSearchAlgorithm = {
+    override def algorithm(candidates: Traversable[Entity]): HeuristicSearchAlgorithm = {
       new ExplanationFinder(candidates.toArray, paths.toList, 4)
     }
   }
