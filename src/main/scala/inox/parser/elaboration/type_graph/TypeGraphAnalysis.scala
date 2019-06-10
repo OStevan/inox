@@ -27,11 +27,8 @@ trait TypeGraphAnalysis extends GraphStructure
         if (path.isUnsatisfiable) {
           Some(path)
         } else {
-          if (path.isValidPath) {
+          if (path.isValidPath || path.isSatisfiablePath) {
             path.incrementSatisfiable()
-          } else if (path.isSatisfiablePath) {
-            path.incrementSatisfiable()
-            // here is where expansion is should be done
           }
           None
         }

@@ -12,6 +12,7 @@ trait GraphStructure {
 
 
   case class Node(element: Element) {
+
     def isConstructor: Boolean = element.isConstructor
 
     def compatibleConstructors(constructorTo: Node): Boolean = element.compatibleConstructors(constructorTo.element)
@@ -41,6 +42,8 @@ trait GraphStructure {
       * @return flag if this Node accepts the other
       */
     def accept(other: Node): Boolean = element.accept(other.element)
+
+    def combine(node: Node): Boolean = element.combine(node.element)
 
     def pos: Position = element.position
 

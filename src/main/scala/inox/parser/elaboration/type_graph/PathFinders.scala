@@ -144,17 +144,19 @@ trait PathFinders {
 
       // trivially satisfiable not informative
       if (firstInPath().isTrivialEnd || lastInPath().isTrivialEnd)
-
-      // path is trivially satisfiable
-        if (firstInPath() entityInformationEquality lastInPath())
-          return false
-
-      // compatible types
-      if (lastInPath() accept firstInPath())
         return false
 
+      // path is trivially satisfiable
+      if (firstInPath() entityInformationEquality lastInPath())
+          return true
 
-      // add a check if an node is added during graph saturation if it is then a path is not informative
+      // accept
+      if (lastInPath() accept firstInPath())
+        return true
+
+      // combine
+      if (firstInPath() combine lastInPath())
+        return true
 
       val leqElements: mutable.Stack[Node] = mutable.Stack()
       val constructorConditions: mutable.Stack[(Int, Edges.ConstructorEdgeDirection.Direction)] = mutable.Stack()
