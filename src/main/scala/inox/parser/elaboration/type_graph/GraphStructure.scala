@@ -10,8 +10,27 @@ trait GraphStructure {
   import Edges._
   import Constraints._
 
+  type Color = Boolean
+  val WHITE: Color = true
+  val BLACK: Color = false
 
-  case class Node(element: Element) {
+  object ElemNodeMap {
+    private var elemNodeMap: Map[Element, Node] = Map.empty
+
+    def getNode(elem: Element, color: Color): Node = {
+      if (elemNodeMap.contains(elem))
+        elemNodeMap(elem)
+      else {
+        val node = Node(elem, color)
+        elemNodeMap = elemNodeMap.updated(elem, node)
+        node
+      }
+    }
+  }
+
+  case class Node(element: Element, color: Color) {
+    def isWhite(): Boolean = color == WHITE
+
 
     def isConstructor: Boolean = element.isConstructor
 
@@ -48,7 +67,7 @@ trait GraphStructure {
     def pos: Position = element.position
 
     override def equals(obj: Any): Boolean = obj match {
-      case Node(ent) => ent == this.element
+      case Node(ent, _) => ent == this.element
       case _ => false
     }
   }
@@ -123,18 +142,18 @@ trait GraphStructure {
     }
   }
 
-  def constructSeq(constraints: Seq[Constraint]): Graph = {
-    val (nodes, edges) = constraints.map((constraint: Constraint) => construct(constraint)).foldLeft((Set.empty[Node], Set.empty[Edge])) {
+  def constructSeq(constraints: Seq[Constraint], color: Color): Graph = {
+    val (nodes, edges) = constraints.map((constraint: Constraint) => construct(constraint, color)).foldLeft((Set.empty[Node], Set.empty[Edge])) {
       case (acc, graph) => (acc._1 union graph._1, acc._2 union graph._2)
     }
 
     new Graph(nodes, edges)
   }
 
-  def construct(constraint: Constraint): (Set[Node], Set[Edge]) = constraint match {
+  def construct(constraint: Constraint, color: Color): (Set[Node], Set[Edge]) = constraint match {
     case Equals(left, right) =>
-      val (leftNode: Node, leftGraph) = construct(left)
-      val (rightNode: Node, rightGraph) = construct(right)
+      val (leftNode: Node, leftGraph) = construct(left, color)
+      val (rightNode: Node, rightGraph) = construct(right, color)
       (
         leftGraph._1 union rightGraph._1,
         leftGraph._2 union rightGraph._2 union Set(
@@ -142,8 +161,8 @@ trait GraphStructure {
           LessEqualEdge(rightNode, leftNode)
         ))
     case HasClass(elem, typeClass) =>
-      val (elemNode, elemGraph) = construct(elem)
-      val typeClassNode = Node(TypeClassElement(typeClass, constraint.pos))
+      val (elemNode, elemGraph) = construct(elem, color)
+      val typeClassNode = ElemNodeMap.getNode(TypeClassElement(typeClass, constraint.pos), color)
       (
         elemGraph._1 + typeClassNode,
         elemGraph._2 + LessEqualEdge(elemNode, typeClassNode)
@@ -153,14 +172,14 @@ trait GraphStructure {
       (Set.empty, Set.empty)
   }
 
-  def construct(tpe: SimpleTypes.Type): (Node, (Set[Node], Set[Edge])) = {
+  def construct(tpe: SimpleTypes.Type, color: Color): (Node, (Set[Node], Set[Edge])) = {
     //    if ()
     //    if (tpe.pos == NoPosition)
     //      assert(tpe.pos == NoPosition, "Every type should have a position for graph analysis")
     tpe match {
       case SimpleTypes.FunctionType(froms, to) =>
-        val (toNode, toGraph) = construct(to)
-        val funNode = Node(TypeElement(tpe))
+        val (toNode, toGraph) = construct(to, color)
+        val funNode = ElemNodeMap.getNode(TypeElement(tpe), color)
 
         val startGraph = (
           toGraph._1 + funNode, // node union
@@ -171,7 +190,7 @@ trait GraphStructure {
 
         (funNode,
           froms.foldLeft((0, startGraph))((pair, elem) => {
-            val (elemNode, elemGraph) = construct(elem)
+            val (elemNode, elemGraph) = construct(elem, color)
             (pair._1 + 1, (
               pair._2._1 union elemGraph._1, // node union
               pair._2._2 union elemGraph._2 union // edge union
@@ -182,11 +201,11 @@ trait GraphStructure {
           })._2
         )
       case SimpleTypes.TupleType(elems) =>
-        val tupleType = Node(TypeElement(tpe))
+        val tupleType = ElemNodeMap.getNode(TypeElement(tpe), color)
 
         (tupleType,
           elems.foldLeft((0, (Set(tupleType), Set.empty[Edge])))((pair, elem) => {
-            val (elemNode, elemGraph) = construct(elem)
+            val (elemNode, elemGraph) = construct(elem, color)
             (pair._1 + 1, (
               pair._2._1 union elemGraph._1,
               pair._2._2 union elemGraph._2 union Set(
@@ -196,8 +215,8 @@ trait GraphStructure {
           })._2
         )
       case SimpleTypes.BagType(elemType) =>
-        val bagNode = Node(TypeElement(tpe))
-        val (elemNode, elemGraph) = construct(elemType)
+        val bagNode = ElemNodeMap.getNode(TypeElement(tpe), color)
+        val (elemNode, elemGraph) = construct(elemType, color)
         (bagNode, (
           elemGraph._1 + bagNode,
           elemGraph._2 union Set(
@@ -206,8 +225,8 @@ trait GraphStructure {
           )
         ))
       case SimpleTypes.SetType(elemType) =>
-        val setNode = Node(TypeElement(tpe))
-        val (elemNode, elemGraph) = construct(elemType)
+        val setNode = ElemNodeMap.getNode(TypeElement(tpe), color)
+        val (elemNode, elemGraph) = construct(elemType, color)
         (setNode, (
           elemGraph._1 + setNode,
           elemGraph._2 union Set(
@@ -216,10 +235,10 @@ trait GraphStructure {
           )
         ))
       case SimpleTypes.ADTType(_, args) =>
-        val adtNode = Node(TypeElement(tpe))
+        val adtNode = ElemNodeMap.getNode(TypeElement(tpe), color)
         (adtNode,
           args.foldLeft((0, (Set(adtNode), Set.empty[Edge])))((pair, elem) => {
-            val (elemNode, elemGraph) = construct(elem)
+            val (elemNode, elemGraph) = construct(elem, color)
             (pair._1 + 1, (
               pair._2._1 union elemGraph._1,
               pair._2._2 union elemGraph._2 union Set(
@@ -229,9 +248,9 @@ trait GraphStructure {
           })._2
         )
       case SimpleTypes.MapType(from, to) =>
-        val (fromNode, fromGraph) = construct(from)
-        val (toNode, toGraph) = construct(to)
-        val mapNode = Node(TypeElement(tpe))
+        val (fromNode, fromGraph) = construct(from, color)
+        val (toNode, toGraph) = construct(to, color)
+        val mapNode = ElemNodeMap.getNode(TypeElement(tpe), color)
         (mapNode,
           (fromGraph._1 union toGraph._1 + mapNode,
             fromGraph._2 union toGraph._2 union Set(
@@ -242,7 +261,7 @@ trait GraphStructure {
           )
         )
       case a: SimpleTypes.Type =>
-        val node = Node(TypeElement(tpe))
+        val node = ElemNodeMap.getNode(TypeElement(tpe), color)
         (node, (Set(node), Set.empty[Edge]))
     }
   }

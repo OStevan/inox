@@ -643,7 +643,7 @@ trait PathFinders {
 
 
     private def addConstraints(constraints: Seq[Constraint]): Unit = {
-      val g = constructSeq(constraints)
+      val g = constructSeq(constraints, BLACK)
       init(g)
     }
 
@@ -651,9 +651,11 @@ trait PathFinders {
       if (equal.from == equal.to)
         return
       (equal.from.element, equal.to.element) match {
-        case (first: TypeElement, second: TypeClassElement) if !expandedTypes.contains((first, second)) =>
+//        case (first@TypeElement(tpe: SimpleTypes.Unknown), second: TypeClassElement) =>
+//          ()
+        case (first@TypeElement(tpe), second: TypeClassElement) if equal.from.isWhite() && !expandedTypes.contains((first, second)) =>
           expandedTypes = expandedTypes + ((first, second))
-          second.typeClass.accepts(first.tpe).foreach(constraints => addConstraints(constraints))
+          second.typeClass.accepts(tpe).foreach(constraints => addConstraints(constraints))
 
         case _ => ()
       }
@@ -674,7 +676,6 @@ trait PathFinders {
     }
 
     def saturation(): Unit = {
-      val allNodes = graph.nodes
 
       //    var processedLengths = 0
 
@@ -686,6 +687,8 @@ trait PathFinders {
           case a: LessEqual => expandOnLEQ(a)
           case _ => ()
         }
+
+        val allNodes = nodeEdgesMap.keySet
 
         for (node <- allNodes) {
           edge match {

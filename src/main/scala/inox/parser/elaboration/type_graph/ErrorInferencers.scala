@@ -54,7 +54,7 @@ trait ErrorInferencers {
       * @return Return an instance of heuristic search algorithm to use
       */
     override def algorithm(candidates: Traversable[Entity]): HeuristicSearchAlgorithm = {
-      new ExplanationFinder(candidates.toArray, paths.toList, 4)
+      new ExplanationFinder(candidates.toArray, paths.toList, 10)
     }
   }
 }

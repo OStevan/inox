@@ -113,7 +113,7 @@ trait TypeGraphAnalysis extends GraphStructure
 
   object GraphDiagnosis {
     def getInstance(goal: Seq[Constraint]): GraphDiagnosis = {
-      val graph = constructSeq(goal)
+      val graph = constructSeq(goal, WHITE)
       new GraphDiagnosis(graph)
     }
   }
