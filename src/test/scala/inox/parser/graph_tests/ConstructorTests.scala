@@ -181,4 +181,61 @@ class ConstructorTests extends FunSuite {
         println(text)
     }
   }
+
+  test("error far apart") {
+    try {
+      p"""
+         type List[A] = Cons(head: A, tail: List[A]) | Nil()
+
+         def makeList[T](size: Int, generator: (() => T)): List[T] = {
+             if (size == 0) Nil()
+             else Cons(generator(), makeList(size - 1, generator))
+         }
+
+         def merge[T](first: List[T], second: List[T], selector:((List[T], List[T]) => (List[T], List[T]))): List[T] = {
+             let result = selector(first, second);
+             if (result._1 is Cons) Cons(result._1.head, merge(result._1.tail, result._2, selector))
+             else result._2
+         }
+
+         def filter[T](list: List[T], test: ((T) => Boolean)) = {
+             if (list is Nil) Nil()
+             else
+                 if (test(list.head)) Cons(test(list.head), filter(list.tail, test))
+                 else filter(list.tail, test)
+         }
+
+         def sum(list: List[Int]) = {
+             if (list is Nil) 0
+             else list.head + sum(list.tail)
+         }
+
+          def main() = {
+              let selector = lambda (first: List[Int], second: List[Int]) => {
+                if (first is Nil) (second, first)
+                else
+                    if (second is Nil) (first, second)
+                    else {
+                        if (first.head > second.head) (first, second)
+                        else (second, first)
+                    }
+              };
+              let x = (x: Int) => x > 2;
+              // imagine random
+              let random = () => 6;
+              let first = makeList[Int](100, random);
+              let second = makeList[Int](200, random);
+              let merged = merge[Int](first, second, selector);
+              let filtered = filter(merged, x);
+              let summed = sum(filtered);
+              summed
+          }
+       """
+      fail("No errors detected, while there should be one")
+    } catch {
+      case InterpolatorException(text) =>
+        assert(text.contains("graph"), text)
+        println(text)
+    }
+  }
 }
