@@ -61,7 +61,8 @@ trait SimpleTypes { self: Trees =>
         case TupleType(elems) => TupleType(elems.map(_.replaceTypeParams(mapping)))
         case ADTType(id, elems) => ADTType(id, elems.map(_.replaceTypeParams(mapping)))
         case _ => this
-      }).withPos(this.pos)
+      })
+//        .withPos(this.pos)
     }
     case class UnitType() extends Type
     case class BooleanType() extends Type

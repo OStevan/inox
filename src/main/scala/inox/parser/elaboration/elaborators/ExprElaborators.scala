@@ -181,6 +181,16 @@ trait ExprElaborators { self: Elaborators =>
                   trees.ADT(i, ets.map(_.get), evas.map(_.get))
                 }
               })
+                // small hack check with Romain
+              case Right((st: SimpleTypes.FunctionType, et)) => {
+                for {
+                  (stas, evas) <- ExprSeqE.elaborate(args)
+                    .checkImmediate(optTypeArgs.isEmpty, template, functionValuesCanNotHaveTypeParameters(i.name))
+                    .map(_.unzip)
+                } yield (st.to.withPos(template.pos), Eventual.withUnifier { implicit unifier =>
+                  trees.Application(trees.Variable(i, et.get, Seq()), evas.map(_.get))
+                })
+              }
               case Right((st, et)) => {
                 val retTpe = SimpleTypes.Unknown.fresh.setPos(template.pos)
                 for {

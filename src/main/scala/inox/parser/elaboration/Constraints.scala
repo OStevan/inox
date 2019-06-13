@@ -365,7 +365,11 @@ trait Constraints { self: IRs with SimpleTypes with ElaborationErrors =>
     }
     case class Bits(signed: Boolean, size: SizeSpec) extends TypeClass {
       override def accepts(tpe: Type) = tpe match {
-        case BitVectorType(`signed`, value) => if (size.accepts(value)) Some(Seq()) else None
+        case BitVectorType(`signed`, value) =>
+          if (size.accepts(value))
+            Some(Seq())
+          else
+            None
         case _ => None
       }
     }
