@@ -18,6 +18,8 @@ trait GraphStructure {
     private var elemNodeMap: Map[Element, Node] = Map.empty
 
     def getNode(elem: Element, color: Color): Node = {
+//      if (elem.position == NoPosition)
+//        assert(elem.position != NoPosition)
       if (elemNodeMap.contains(elem))
         elemNodeMap(elem)
       else {

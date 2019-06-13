@@ -11,7 +11,7 @@ class SimpleTests extends FunSuite {
 
  test("conflict with user assigned type") {
    try {
-     e"""let x: Int = 'bla';
+     e"""let x: Int = 'foo';
         length(x)"""
      fail("No errors detected, while there should be one")
    } catch {

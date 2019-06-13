@@ -40,7 +40,7 @@ trait TypeGraphAnalysis extends GraphStructure
       var unsatisfiable: List[GraphPath] = List()
 
 
-      for (start <- graph.nodes) {
+      for (start <- pathFinder.nodes) {
         for (end <- graph.nodes) {
           if (pathFinder.hasLeqEdge(start, end)) {
             // skolem check is not needed
@@ -62,12 +62,12 @@ trait TypeGraphAnalysis extends GraphStructure
     def generateUnsatisfiablePairs(element: Element): Set[Element] = {
       var pairs: Set[Element] = Set.empty
 
-      assert(graph.elementNodeMap.keySet contains element)
+//      assert(graph.elementNodeMap.keySet contains element)
 
-      val node = graph.elementNodeMap(element)
+      val node = pathFinder.elementNodeMap(element)
 
 
-      for (other <- graph.nodes) {
+      for (other <- pathFinder.nodes) {
         if (pathFinder.hasLeqEdge(node, other)) {
           val hops: List[Edge] = pathFinder.getPath(node, other)
           testConsistency(node, other, hops, pathFinder).foreach(_ => pairs = pairs + other.element)
@@ -75,6 +75,15 @@ trait TypeGraphAnalysis extends GraphStructure
         if (pathFinder.hasLeqEdge(other, node)) {
           val hops: List[Edge] = pathFinder.getPath(other, node)
           testConsistency(other, node, hops, pathFinder).foreach(_ => pairs = pairs + other.element)
+        }
+        if (pathFinder.hasCombineEdge(other, node)) {
+          val hops: List[Edge] = pathFinder.getPath(other, node)
+          testConsistency(other, node, hops, pathFinder).foreach(_ => pairs = pairs + other.element)
+        }
+
+        if (pathFinder.hasCombineEdge(node, other)) {
+          val hops: List[Edge] = pathFinder.getPath(node, other)
+          testConsistency(node, other, hops, pathFinder).foreach(_ => pairs = pairs + other.element)
         }
       }
 

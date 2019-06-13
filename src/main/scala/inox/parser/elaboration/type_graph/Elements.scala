@@ -87,22 +87,23 @@ trait Elements {
       case (SimpleTypes.CharType(), SimpleTypes.CharType()) => true
       case (SimpleTypes.RealType(), SimpleTypes.RealType()) => true
       case (SimpleTypes.FunctionType(fs1, t1), SimpleTypes.FunctionType(fs2, t2)) if fs1.size == fs2.size => {
-        fs1.zip(fs2).forall(pair => accept(pair._1, pair._2)) && accept(t1, t2)
+        true
       }
       case (SimpleTypes.TupleType(es1), SimpleTypes.TupleType(es2)) if es1.size == es2.size =>
-        es1.zip(es2).forall(pair => accept(pair._1, pair._2))
+        true
       case (SimpleTypes.MapType(f1, t1), SimpleTypes.MapType(f2, t2)) => {
-        accept(f1, f2) && accept(t1, t2)
+        true
       }
       case (SimpleTypes.SetType(e1), SimpleTypes.SetType(e2)) => accept(e1, e2)
       case (SimpleTypes.BagType(e1), SimpleTypes.BagType(e2)) => accept(e1, e2)
       case (SimpleTypes.ADTType(i1, as1), SimpleTypes.ADTType(i2, as2)) if i1 == i2 && as1.size == as2.size =>
-        as1.zip(as2).forall(pair => accept(pair._1, pair._2))
+        true
       case (SimpleTypes.TypeParameter(i1), SimpleTypes.TypeParameter(i2)) if i1 == i2 => true
       case _ => false
     }
 
     def accept(other: Element): Boolean = (this, other) match {
+      case (_: TypeClassElement, TypeElement(_: SimpleTypes.Unknown)) => true
       case (first: TypeClassElement, second: TypeElement) => first.typeClass.accepts(second.tpe).isInstanceOf[Some[Seq[Constraint]]]
       case (_: TypeClassElement, _: TypeClassElement) =>
         false

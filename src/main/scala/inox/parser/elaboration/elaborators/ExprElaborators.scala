@@ -173,7 +173,7 @@ trait ExprElaborators { self: Elaborators =>
                   .checkImmediate(_.size == ests.size, template, xs => wrongNumberOfArguments(i.name, ests.size, xs.size))
                   .map(_.unzip)
                 _ <- Constrained(ests.zip(stas).map { case (est, ast) => Constraint.equal(est, ast) }: _*)
-              } yield (rst, Eventual.withUnifier { implicit unifier =>
+              } yield (rst.withPos(template.pos), Eventual.withUnifier { implicit unifier =>
                 if (isFun) {
                   trees.FunctionInvocation(i, ets.map(_.get), evas.map(_.get))
                 }

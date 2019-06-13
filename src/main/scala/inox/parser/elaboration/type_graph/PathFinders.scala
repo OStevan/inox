@@ -146,17 +146,17 @@ trait PathFinders {
       if (firstInPath().isTrivialEnd || lastInPath().isTrivialEnd)
         return false
 
-      // path is trivially satisfiable
-      if (firstInPath() entityInformationEquality lastInPath())
-          return true
-
-      // accept
-      if (lastInPath() accept firstInPath())
-        return true
-
-      // combine
-      if (firstInPath() combine lastInPath())
-        return true
+//      // path is trivially satisfiable
+//      if (firstInPath() entityInformationEquality lastInPath())
+//          return true
+//
+//      // accept
+//      if (lastInPath() accept firstInPath())
+//        return true
+//
+//      // combine
+//      if (firstInPath() combine lastInPath())
+//        return true
 
       val leqElements: mutable.Stack[Node] = mutable.Stack()
       val constructorConditions: mutable.Stack[(Int, Edges.ConstructorEdgeDirection.Direction)] = mutable.Stack()
@@ -216,6 +216,8 @@ trait PathFinders {
     */
   trait PathFinder {
     def graph: Graph
+
+    def nodes: Traversable[Node]
 
     protected trait ReductionEdge extends Edge
 
@@ -280,7 +282,6 @@ trait PathFinders {
     var graph: Graph = _
 
     protected val nextHop: mutable.Map[Node, mutable.Map[Node, List[Evidence]]] = mutable.Map()
-    private val atomicEdges: mutable.Map[Node, mutable.Set[Node]] = mutable.Map()
 
 
     // public
@@ -293,7 +294,7 @@ trait PathFinders {
       getLeqPath(from, to)
     }
 
-    def inferLeqEdge(from: Node, to: Node, length: Int, evidence: List[Evidence], atomic: Boolean)
+    def inferLeqEdge(from: Node, to: Node, length: Int, evidence: List[Evidence])
 
     // protected
     protected def addNextHop(start: Node, end: Node, evidence: List[Evidence]): Unit = {
@@ -308,13 +309,6 @@ trait PathFinders {
       nextHop.getOrElse(start, mutable.Map()).getOrElse(end, List())
     }
 
-    protected def addAtomicLeqEdge(from: Node, to: Node): Unit = {
-      atomicEdges.getOrElseUpdate(from, new mutable.HashSet[Node]()).add(to)
-    }
-
-    protected def hasAtomicEdge(from: Node, to: Node): Boolean = {
-      atomicEdges.getOrElseUpdate(from, new mutable.HashSet[Node]()).contains(to)
-    }
 
     protected def getLeqPath(from: Node, to: Node): List[Edge] = {
       val evidence = getNextHop(from, to)
@@ -411,6 +405,8 @@ trait PathFinders {
     * Finds shortest paths
     */
   class ShortestPathFinder(g: Graph) extends CFLPathFinder(g) {
+    def elementNodeMap(element: Element): Node = ElemNodeMap.getNode(element, WHITE)
+
     private val INFINITY = Int.MaxValue
     private val shortestLEQPaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()
     private val shortestReversePaths = new mutable.HashMap[Node, mutable.Map[Node, Int]]()
@@ -425,6 +421,8 @@ trait PathFinders {
 
     // queue representing the context free reachability frontier
     val queue: mutable.Queue[ReductionEdge] = mutable.Queue[ReductionEdge]()
+
+    override def nodes: Traversable[Node] = nodeEdgesMap.keySet
 
 
 
@@ -441,13 +439,13 @@ trait PathFinders {
 
         edge match {
           case a: Edges.LessEqualEdge =>
-            inferLeqEdge(a.from, a.to, 1, List.empty, atomic = true)
+            inferLeqEdge(a.from, a.to, 1, List.empty)
             if (a.to.element.isInstanceOf[TypeClassElement]) {
-              inferReverse(a.to, a.from, 1, List.empty, atomic = true)
+              inferReverse(a.to, a.from, 1, List.empty)
               insertOriginal(a.from, a.to)
             }
           case Edges.ConstructorEdge(from, to, Edges.ConstructorEdgeDirection.Original, position) =>
-            inferLeftEdge(from, to, 1, List.empty, position, atomic = true)
+            inferLeftEdge(from, to, 1, List.empty, position)
           case Edges.ConstructorEdge(from, to, Edges.ConstructorEdgeDirection.Decompositional, position) =>
             insertRightEdge(from, to, position)
         }
@@ -473,26 +471,24 @@ trait PathFinders {
 
 
     // new edge inference either from constructed graph of using
-    override def inferLeqEdge(from: Node, to: Node, length: Int, evidence: List[Evidence], atomic: Boolean): Unit = {
-      if (from entityInformationEquality to)
+    override def inferLeqEdge(from: Node, to: Node, length: Int, evidence: List[Evidence]): Unit = {
+      if (from.element == to.element)
         return
       addNextHop(from, to, evidence)
       queue.enqueue(LessEqual(from, to, length))
       setShortestLeqLength(from, to, length)
-      if (atomic)
-        addAtomicLeqEdge(from, to)
     }
 
-    protected def inferLeftEdge(from: Node, to: Node, length: Int, evidence: List[Evidence], position: Int, atomic: Boolean): Unit = {
-      if (from entityInformationEquality to)
+    protected def inferLeftEdge(from: Node, to: Node, length: Int, evidence: List[Evidence], position: Int): Unit = {
+      if (from.element == to.element)
         return
       addNextHop(from, to, evidence)
       queue.enqueue(LeftEdge(from, to, position, length))
       setShortestLeftLength(from, to, position, length)
     }
 
-    protected def inferReverse(from: Node, to: Node, length: Int, evidence: List[Evidence], atomic: Boolean): Unit = {
-      if (from entityInformationEquality to)
+    protected def inferReverse(from: Node, to: Node, length: Int, evidence: List[Evidence]): Unit = {
+      if (from.element == to.element)
         return
       addNextHop(from, to, evidence)
       queue.enqueue(ReverseEdge(from, to))
@@ -501,7 +497,7 @@ trait PathFinders {
 
 
     protected def inferCombineEdge(from: Node, to: Node, length: Int, evidence: List[ShortestPathFinder.this.Evidence]): Unit = {
-      if (to entityInformationEquality from)
+      if (to.element == from.element)
         return
       addNextHop(from, to, evidence)
       setShortestCombine(from, to, length)
@@ -560,7 +556,7 @@ trait PathFinders {
 
     // CFG shortest path rules implementation
     override protected def ruleLeqLeq(from: Node, mid: Node, to: Node): Unit = {
-      if (from entityInformationEquality to)
+      if (from.element == to.element)
         return
       val leftDistance = getShortestLeqLength(from, mid)
       val rightDistance = getShortestLeqLength(mid, to)
@@ -570,13 +566,13 @@ trait PathFinders {
         return
       if (leftDistance + rightDistance < currentDistance) {
         setShortestLeqLength(from, to, leftDistance + rightDistance)
-        inferLeqEdge(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)), atomic = false)
+        inferLeqEdge(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)))
       }
 
     }
 
     override protected def ruleLeftLeq(from: Node, mid: Node, to: Node, position: Int): Unit = {
-      if (from entityInformationEquality to)
+      if (from.element == to.element)
         return
       val leftDistance = getShortestLeftLength(from, mid, position)
       val rightDistance = getShortestLeqLength(mid, to)
@@ -586,12 +582,12 @@ trait PathFinders {
         return
       if (leftDistance + rightDistance < currentDistance) {
         setShortestLeftLength(from, to, position, leftDistance + rightDistance)
-        inferLeftEdge(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)), atomic = false, position = position)
+        inferLeftEdge(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)), position = position)
       }
     }
 
     override protected def ruleReverseLeq(from: Node, mid: Node, to: Node): Unit = {
-      if (from entityInformationEquality to)
+      if (from.element == to.element)
         return
       val leftDistance = getShortestReverse(from, mid)
       val rightDistance = getShortestLeqLength(mid, to)
@@ -601,13 +597,13 @@ trait PathFinders {
         return
       if (leftDistance + rightDistance < currentDistance) {
         setShortestReverse(from, to, leftDistance + rightDistance)
-        inferReverse(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)), atomic = false)
+        inferReverse(from, to, leftDistance + rightDistance, List(new Evidence(from, mid), new Evidence(mid, to)))
       }
     }
 
 
     override protected def ruleLeftRight(from: Node, mid: Node, to: Node, position: Int): Unit = {
-      if (from entityInformationEquality to)
+      if (from.element == to.element)
         return
 
       val leftDistance = getShortestLeftLength(from, mid, position)
@@ -617,13 +613,13 @@ trait PathFinders {
         return
       if (leftDistance + 1 < currentDistance) {
         setShortestLeqLength(from, to, leftDistance + 1)
-        inferLeqEdge(from, to, leftDistance + 1, List(new Evidence(from, mid), new Evidence(mid, to)), atomic = false)
+        inferLeqEdge(from, to, leftDistance + 1, List(new Evidence(from, mid), new Evidence(mid, to)))
       }
     }
 
 
     override protected def ruleReverseOriginal(from: Node, mid: Node, to: Node): Unit = {
-      if (from entityInformationEquality to)
+      if (from.element == to.element)
         return
       val reverseDistance = getShortestReverse(from, mid)
       val currentDistance = getShortestCombine(from, to)
@@ -651,8 +647,8 @@ trait PathFinders {
       if (equal.from == equal.to)
         return
       (equal.from.element, equal.to.element) match {
-//        case (first@TypeElement(tpe: SimpleTypes.Unknown), second: TypeClassElement) =>
-//          ()
+        case (first@TypeElement(tpe: SimpleTypes.Unknown), second: TypeClassElement) =>
+          ()
         case (first@TypeElement(tpe), second: TypeClassElement) if equal.from.isWhite() && !expandedTypes.contains((first, second)) =>
           expandedTypes = expandedTypes + ((first, second))
           second.typeClass.accepts(tpe).foreach(constraints => addConstraints(constraints))
@@ -662,7 +658,7 @@ trait PathFinders {
     }
 
     def expandOnCombine(from: Node, to: Node): Unit = {
-      if (from == to)
+      if (from.element == to.element)
         return
       (from.element, to.element) match {
         case (first: TypeClassElement, second: TypeClassElement)
@@ -693,14 +689,14 @@ trait PathFinders {
         for (node <- allNodes) {
           edge match {
             case LessEqual(from, to, _) =>
-              if (hasAtomicEdge(to, node))
+              if (hasLeqEdge(to, node))
                 ruleLeqLeq(from, to, node)
-              if (hasAtomicEdge(node, from))
+              if (hasLeqEdge(node, from))
                 ruleLeqLeq(node, from, to)
               if (hasReverseEdge(node, from))
                 ruleReverseLeq(node, from, to)
             case LeftEdge(from, to, position, _) =>
-              if (hasAtomicEdge(to, node))
+              if (hasLeqEdge(to, node))
                 ruleLeftLeq(from, to, node, position)
               if (hasRightEdge(to, node, position))
                 ruleLeftRight(from, to, node, position)

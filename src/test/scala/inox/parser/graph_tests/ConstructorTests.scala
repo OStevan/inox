@@ -105,13 +105,32 @@ class ConstructorTests extends FunSuite {
   }
 
 
-  test("conflict in ADT type parameter") {
+  test("two distinct errors") {
     try {
       p"""
           type List[A] = Cons(head: A, tail: List[A]) | Nil()
 
-          def dummy(xs: List[Int]): Integer =
-            1 + xs.head
+          def insert(value: Int, list: List[Int]) = {
+              if (list is Cons) {
+                  if ('value' > list.head)
+                    Cons(list.head, insert(value, list.tail))
+                  else
+                    Cons(value, list)
+              } else
+                Cons(value, list)
+          }
+
+          def sort(list: List[Int]) = {
+            if (list is Cons) {
+              insert(list.head, sort(list.tail))
+            } else
+              Nil()
+          }
+
+          def main() = {
+            let list = Cons(2, Cons(3, Cons(-10, Cons(1, Cons(`a`, Cons(1000, Nil()))))));
+            sort(list)
+          }
         """
       fail("No errors detected, while there should be one")
     } catch {
@@ -139,8 +158,21 @@ class ConstructorTests extends FunSuite {
       e"""
          let x = 1;
          let y = Set(x);
-         let z = Bag(x -> 1);
+         let z = Bag('stevan' -> 1);
          setUnion(y, z)
+       """
+      fail("No errors detected, while there should be one")
+    } catch {
+      case InterpolatorException(text) =>
+        assert(text.contains("graph"), text)
+        println(text)
+    }
+  }
+
+  test("Type parameter test") {
+    try {
+      p"""
+         def test[A](a: A): Int = a
        """
       fail("No errors detected, while there should be one")
     } catch {
